@@ -1,8 +1,8 @@
-#[derive(Debug)]
-pub struct Atom(u64);
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub struct Atom(usize);
 
 #[derive(Debug)]
-pub struct AtomCreator(u64);
+pub struct AtomCreator(usize);
 
 impl AtomCreator {
     pub fn new() -> AtomCreator {
@@ -20,9 +20,15 @@ mod test {
     use super::AtomCreator;
 
     #[test]
-    fn t() {
+    fn atoms_are_distinct() {
         let mut subject = AtomCreator::new();
-        assert_eq!(0, subject.create().0);
-        assert_eq!(1, subject.create().0);
+        assert!(subject.create() != subject.create());
+    }
+
+    #[test]
+    fn atoms_can_move() {
+        let subject = AtomCreator::new().create();
+        let x1 = subject;
+        assert_eq!(subject, x1);
     }
 }
