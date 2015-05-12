@@ -36,7 +36,7 @@ where T: Fn(&mut Pipl, Atom, Results) {
         let results = Rc::new(RefCell::new(HashMap::new()));
         let w = pipl.atom();
         func(pipl, w, results.clone());
-        let keys = {let mut t = results.borrow().keys().map(|k| k.clone()).collect::<Vec<&str>>(); t.sort(); t };
+        let keys = { let mut t = results.borrow().keys().map(|k| k.clone()).collect::<Vec<&str>>(); t.sort(); t };
         assert_eq!(vec!["x", "y", "z"], keys);
         assert_eq!(results.borrow().get("z"), results.borrow().get("x"));
         assert_eq!(results.borrow().get("z"), results.borrow().get("y"));
