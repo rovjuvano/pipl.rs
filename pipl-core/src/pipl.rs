@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use std::fmt::Error;
 use atom::Atom;
 use atom::AtomCreator;
-use self::PiplAtom::{Pos,Neg};
+use self::PiplFunc::{Pos,Neg};
 
 // #[derive(Debug)]
 pub struct Pipl {
@@ -11,35 +11,21 @@ pub struct Pipl {
     atom_queues: Vec<PiplAtom>,
 }
 
-struct PosPiplAtom {
+enum PiplFunc {
+    Pos(Box<Fn(&mut Pipl) -> Vec<Atom>>),
+    Neg(Box<Fn(&mut Pipl, Vec<Atom>)>),
+}
+struct PiplAtom {
     atom: Atom,
-    func: Box<Fn(&mut Pipl, &mut Vec<Atom>)>
-}
-impl Debug for PosPiplAtom {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "Pos:{:?}", self.atom)
-    }
-}
-struct NegPiplAtom {
-    atom: Atom,
-    func: Box<Fn(&mut Pipl, &Vec<Atom>)>
-}
-impl Debug for NegPiplAtom {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "Neg:{:?}", self.atom)
-    }
-}
-enum PiplAtom {
-    Pos(PosPiplAtom),
-    Neg(NegPiplAtom),
+    func: PiplFunc,
 }
 impl Debug for PiplAtom {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let (case, atom) = match self {
-            ref atom @ &Pos(_) => ("Pos", atom),
-            ref atom @ &Neg(_) => ("Neg", atom),
+        let case = match self.func {
+            Pos(_) => "Pos",
+            Neg(_) => "Neg",
         };
-        write!(f, "{}:{:?}", case, atom)
+        write!(f, "{:?}:{:?}", case, self.atom)
     }
 }
 
@@ -54,29 +40,37 @@ impl Pipl {
         self.atom_creator.create()
     }
     pub fn add_positive<T>(&mut self, atom: Atom, func: T)
-        where T: Fn(&mut Pipl, &mut Vec<Atom>) + 'static {
-        self.add_atom(PiplAtom::Pos(PosPiplAtom {
+        where T: Fn(&mut Pipl) -> Vec<Atom> + 'static {
+        self.add_atom(PiplAtom {
             atom: atom,
-            func: Box::new(func)
-        }));
+            func: PiplFunc::Pos(Box::new(func)),
+        });
     }
     pub fn add_negative<T>(&mut self, atom: Atom, func: T)
-        where T: Fn(&mut Pipl, &Vec<Atom>) + 'static {
-        self.add_atom(PiplAtom::Neg(NegPiplAtom {
+        where T: Fn(&mut Pipl, Vec<Atom>) + 'static {
+        self.add_atom(PiplAtom {
             atom: atom,
-            func: Box::new(func)
-        }));
+            func: PiplFunc::Neg(Box::new(func)),
+        });
     }
     fn add_atom(&mut self, atom: PiplAtom) {
-        match (atom, if self.atom_queues.len() > 0 { self.atom_queues.pop() } else { None::<PiplAtom> }) {
-            (Pos(pos), Some(Neg(neg))) | (Neg(neg), Some(Pos(pos))) => self.react(pos, neg),
-            (atom, _) => self.atom_queues.push(atom),
+        if self.atom_queues.len() > 0 {
+            let other = self.atom_queues.pop().unwrap();
+            self.react(atom, other);
+        }
+        else {
+            self.atom_queues.push(atom);
         }
     }
-    fn react(&mut self, pos: PosPiplAtom, neg: NegPiplAtom) {
-        println!("{:?} -> {:?}", pos, neg);
-        let mut args = vec![];
-        (pos.func)(self, &mut args);
-        (neg.func)(self, &args);
+    fn react(&mut self, a0: PiplAtom, a1: PiplAtom) {
+        println!("{:?} <-> {:?}", a0, a1);
+        match (a0.func , a1.func) {
+            (Pos(pos_func), Neg(neg_func)) |
+            (Neg(neg_func), Pos(pos_func)) => {
+                let args = (pos_func)(self);
+                (neg_func)(self, args);
+            },
+            (_, _) => panic!("woops"),
+        }
     }
 }

@@ -11,14 +11,14 @@ type Results = Rc<RefCell<HashMap<&'static str, Atom>>>;
 // w(m).m[n].() w(o).o[p].() w[z].z(z).()
 
 fn w_read(pipl: &mut Pipl, w: Atom, n1: &'static str, n2: &'static str, results: Results) {
-    pipl.add_positive(w, move |pipl, args| {
+    pipl.add_positive(w, move |pipl| {
         let a = pipl.atom();
-        args.push(a);
         results.borrow_mut().insert(n1, a);
         let results = results.clone();
         pipl.add_negative(a, move |_pipl, args| {
             results.borrow_mut().insert(n2, args[0]);
         });
+        vec![a]
     });
 }
 fn wm_mn(pipl: &mut Pipl, w: Atom, results: Results) {
@@ -31,8 +31,8 @@ fn wz_zz(pipl: &mut Pipl, w: Atom, results: Results) {
     pipl.add_negative(w, move |pipl, args| {
         let z = args[0];
         results.borrow_mut().insert("z", z);
-        pipl.add_positive(z, move |_pipl, args| {
-            args.push(z);
+        pipl.add_positive(z, move |_pipl| {
+            vec![z]
         });
     });
 }

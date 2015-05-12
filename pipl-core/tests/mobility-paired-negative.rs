@@ -15,10 +15,10 @@ fn w_send(pipl: &mut Pipl, w: Atom, n1: &'static str, n2: &'static str, results:
         let a = args[0];
         results.borrow_mut().insert(n1, a);
         let results = results.clone();
-        pipl.add_positive(a, move |pipl, args| {
+        pipl.add_positive(a, move |pipl| {
             let b = pipl.atom();
-            args.push(b);
             results.borrow_mut().insert(n2, b);
+            vec![b]
         });
     });
 }
@@ -29,14 +29,14 @@ fn wo_op(pipl: &mut Pipl, w: Atom, results: Results) {
     w_send(pipl, w, "o", "p", results);
 }
 fn wz_zz(pipl: &mut Pipl, w: Atom, results: Results) {
-    pipl.add_positive(w, move |pipl, args| {
+    pipl.add_positive(w, move |pipl| {
         let z = pipl.atom();
-        args.push(z);
         results.borrow_mut().insert("z0", z);
         let results = results.clone();
         pipl.add_negative(z, move |_pipl, args| {
             results.borrow_mut().insert("z1", args[0]);
         });
+        vec![z]
     });
 }
 
