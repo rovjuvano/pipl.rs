@@ -28,7 +28,7 @@ impl Mods {
         }
     }
     fn add_sequence(&mut self, refs: Refs, sequence: Rc<Sequence>) {
-        let channel = sequence.channel().clone();
+        let channel = sequence.channel().translate(&refs);
         let reaction = SequenceReaction::new(refs, sequence);
         self.new.push((channel, reaction));
     }
