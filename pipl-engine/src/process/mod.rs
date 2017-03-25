@@ -1,8 +1,6 @@
 pub mod call_process;
 use self::call_process::CallProcess;
 
-pub mod mods;
-
 pub mod sequence;
 use self::sequence::Sequence;
 

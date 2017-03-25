@@ -1,6 +1,8 @@
+pub mod mods;
+use self::mods::Mods;
+
 use ::channel::Channel;
 use ::name::Name;
-use ::process::mods::Mods;
 use ::process::sequence::Sequence;
 use ::reaction::sequence::SequenceReaction;
 use ::refs::Refs;
@@ -19,14 +21,18 @@ impl Pipl {
     pub fn add(&mut self, sequence: Sequence) {
         let channel = sequence.channel().clone();
         let reaction = SequenceReaction::new(Refs::new(), Rc::new(sequence));
-        self.map.add(&channel, reaction);
+        self.add_reaction(&channel, reaction);
     }
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
-            let mut pipl = Mods::new();
-            let output = sender.output(&mut pipl);
-            reader.input(&mut pipl, output);
+            let mut mods = Mods::new();
+            let output = sender.output(&mut mods);
+            reader.input(&mut mods, output);
+            mods.apply(self);
         }
+    }
+    fn add_reaction(&mut self, channel: &Channel, reaction: SequenceReaction) {
+        self.map.add(channel, reaction);
     }
 }
 #[derive(Debug)]
