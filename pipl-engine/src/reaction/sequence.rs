@@ -1,3 +1,4 @@
+use ::channel::Channel;
 use ::name::Name;
 use ::pipl::mods::Mods;
 use ::process::sequence::Sequence;
@@ -11,6 +12,9 @@ pub struct SequenceReaction {
 impl SequenceReaction {
     pub fn new(refs: Refs, sequence: Rc<Sequence>) -> Self {
         SequenceReaction { refs: refs, sequence: sequence }
+    }
+    pub fn channels(&self) -> Vec<&Channel> {
+        vec![self.sequence.channel()]
     }
     pub fn input(self, mods: &mut Mods, names: Vec<Name>) {
         let SequenceReaction { mut refs, sequence } = self;
@@ -30,5 +34,9 @@ impl SequenceReaction {
             mods.add_sequence(refs.clone(), sequence.clone())
         }
         mods.produce(refs, sequence.suffix());
+    }
+    #[inline]
+    pub fn refs(&self) -> &Refs {
+        &self.refs
     }
 }

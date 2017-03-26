@@ -1,5 +1,5 @@
 extern crate pipl_engine;
-use pipl_engine::{Call, CallProcess, Name, ParallelProcess, Pipl, Prefix, Process, Refs, Sequence};
+use pipl_engine::{Call, CallProcess, ChoiceProcess, Name, ParallelProcess, Pipl, Prefix, Process, Refs, Sequence};
 use pipl_engine::Process::Terminal;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -47,6 +47,11 @@ fn log<K: Into<String>>(key: K, suffix: Process, results: Rc<Results>) -> Proces
 }
 fn call(call: Rc<Call>, suffix: Process) -> Process {
     Process::Call(Rc::new(CallProcess::new(call, suffix)))
+}
+fn choice(sequences: Vec<Sequence>) -> Process {
+    Process::Choice(Rc::new(ChoiceProcess::new(
+        sequences.into_iter().map(|x| Rc::new(x)).collect()
+    )))
 }
 fn parallel(sequences: Vec<Sequence>) -> Process {
     Process::Parallel(Rc::new(ParallelProcess::new(
@@ -287,6 +292,39 @@ fn terminate_parallel() {
     expected.log(f(&send(w, &[a])), refs_empty.clone());
     expected.log(f(&send(a, &[b])), refs_empty.clone());
     expected.log(f(&send(y, &[c])), refs_empty.clone());
+    pipl.step();
+    pipl.step();
+    pipl.step();
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn terminate_choice() {
+    // w[x].(+ x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
+    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
+    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(
+        vec![read(w, &[x])],
+        choice(vec![
+            make(vec![read(x, &[y])], Terminal, actual.clone()),
+            make(vec![read(y, &[z]), read(y, &[z])], Terminal, actual.clone()),
+        ]),
+        actual.clone()
+    ));
+    pipl.add(make(vec![send(w, &[a]), send(a, &[b]), send(y, &[c])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(b, &[d])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_empty = Refs::new();
+    let refs_wx = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    let refs_wxxy = &mut refs_wx.clone();
+    refs_wxxy.set(y.clone(), b.clone());
+    expected.log(f(&read(x, &[y])), refs_wxxy.clone());
+    expected.log(f(&send(w, &[a])), refs_empty.clone());
+    expected.log(f(&send(a, &[b])), refs_empty.clone());
     pipl.step();
     pipl.step();
     pipl.step();

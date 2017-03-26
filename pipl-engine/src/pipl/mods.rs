@@ -1,15 +1,16 @@
 use ::channel::Channel;
 use ::pipl::Pipl;
 use ::process::call_process::CallProcess;
+use ::process::choice::ChoiceProcess;
 use ::process::parallel::ParallelProcess;
 use ::process::Process;
 use ::process::sequence::Sequence;
-use ::reaction::sequence::SequenceReaction;
+use ::reaction::Reaction;
 use ::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct Mods {
-    new: Vec<(Channel, SequenceReaction)>,
+    new: Vec<(Channel, Rc<Reaction>)>,
 }
 impl Mods {
     pub fn new() -> Self {
@@ -24,9 +25,19 @@ impl Mods {
         use Process::*;
         match process {
             &Call(ref p)     => self.call(refs, p.clone()),
+            &Choice(ref p)   => self.add_choice(refs, p.clone()),
             &Parallel(ref p) => self.add_parallel(refs, p.clone()),
             &Sequence(ref p) => self.add_sequence(refs, p.clone()),
             &Terminal        => {},
+        }
+    }
+    fn add_choice(&mut self, refs: Refs, choice: Rc<ChoiceProcess>) {
+        let channels: Vec<_> = choice.options().iter().map(|s|
+            s.channel().translate(&refs)
+        ).collect();
+        let reaction = Rc::new(Reaction::new_choice(refs, choice.clone()));
+        for c in channels.into_iter() {
+            self.new.push((c, reaction.clone()));
         }
     }
     fn add_parallel(&mut self, refs: Refs, parallel: Rc<ParallelProcess>) {
@@ -39,8 +50,8 @@ impl Mods {
     }
     pub fn add_sequence(&mut self, refs: Refs, sequence: Rc<Sequence>) {
         let channel = sequence.channel().translate(&refs);
-        let reaction = SequenceReaction::new(refs, sequence);
-        self.new.push((channel, reaction));
+        let reaction = Reaction::new_sequence(refs, sequence);
+        self.new.push((channel, Rc::new(reaction)));
     }
     fn call(&mut self, refs: Refs, call: Rc<CallProcess>) {
         let new_refs = call.call.call(refs);
