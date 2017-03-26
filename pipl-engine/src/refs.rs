@@ -77,4 +77,26 @@ mod tests {
         assert_eq!(subject.refs.get(&n(k2)), Some(&n(v2)));
         assert_eq!(subject.refs.get(&n(k3)), Some(&n(v3)));
     }
+    #[test]
+    fn set_names_short_keys() {
+        let mut subject = Refs::new();
+        let (k1, v1) = (0x0A, 0x01);
+        let (k2, v2) = (0x0B, 0x02);
+        let keys = vec![n(k1)];
+        let values = vec![n(v1), n(v2)];
+        subject.set_names(keys, values);
+        assert_eq!(subject.get(&n(k1)), n(v1));
+        assert_eq!(subject.get(&n(k2)), n(k2));
+    }
+    #[test]
+    fn set_names_short_values() {
+        let mut subject = Refs::new();
+        let (k1, v1) = (0x0A, 0x01);
+        let (k2,) = (0x0B,);
+        let keys = vec![n(k1), n(k2)];
+        let values = vec![n(v1)];
+        subject.set_names(keys, values);
+        assert_eq!(subject.get(&n(k1)), n(v1));
+        assert_eq!(subject.get(&n(k2)), n(k2));
+    }
 }
