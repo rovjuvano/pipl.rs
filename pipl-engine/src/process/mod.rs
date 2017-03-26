@@ -1,6 +1,9 @@
 pub mod call_process;
 use self::call_process::CallProcess;
 
+pub mod parallel;
+use self::parallel::ParallelProcess;
+
 pub mod sequence;
 use self::sequence::Sequence;
 
@@ -8,6 +11,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub enum Process {
     Call(Rc<CallProcess>),
+    Parallel(Rc<ParallelProcess>),
     Sequence(Rc<Sequence>),
     Terminal,
 }

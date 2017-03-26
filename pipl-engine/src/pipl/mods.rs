@@ -1,6 +1,7 @@
 use ::channel::Channel;
 use ::pipl::Pipl;
 use ::process::call_process::CallProcess;
+use ::process::parallel::ParallelProcess;
 use ::process::Process;
 use ::process::sequence::Sequence;
 use ::reaction::sequence::SequenceReaction;
@@ -23,8 +24,17 @@ impl Mods {
         use Process::*;
         match process {
             &Call(ref p)     => self.call(refs, p.clone()),
+            &Parallel(ref p) => self.add_parallel(refs, p.clone()),
             &Sequence(ref p) => self.add_sequence(refs, p.clone()),
             &Terminal        => {},
+        }
+    }
+    fn add_parallel(&mut self, refs: Refs, parallel: Rc<ParallelProcess>) {
+        if let Some((last, head)) = parallel.sequences().split_last() {
+            for s in head.iter() {
+                self.add_sequence(refs.clone(), s.clone());
+            }
+            self.add_sequence(refs, last.clone());
         }
     }
     pub fn add_sequence(&mut self, refs: Refs, sequence: Rc<Sequence>) {

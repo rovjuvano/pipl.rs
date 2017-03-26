@@ -15,6 +15,7 @@ pub use self::prefix::Prefix;
 mod process;
 pub use self::process::call_process::CallProcess;
 pub use self::process::Process;
+pub use self::process::parallel::ParallelProcess;
 pub use self::process::sequence::Sequence;
 
 mod reaction;
