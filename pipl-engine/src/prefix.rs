@@ -27,6 +27,10 @@ impl Prefix {
         &self.channel
     }
     #[inline]
+    pub fn is_repeating(&self) -> bool {
+        self.repeating
+    }
+    #[inline]
     pub fn names(&self) -> &Vec<Name> {
         &self.names
     }

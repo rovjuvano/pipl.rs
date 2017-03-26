@@ -27,7 +27,7 @@ impl Mods {
             &Terminal        => {},
         }
     }
-    fn add_sequence(&mut self, refs: Refs, sequence: Rc<Sequence>) {
+    pub fn add_sequence(&mut self, refs: Refs, sequence: Rc<Sequence>) {
         let channel = sequence.channel().translate(&refs);
         let reaction = SequenceReaction::new(refs, sequence);
         self.new.push((channel, reaction));

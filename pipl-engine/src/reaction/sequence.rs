@@ -26,6 +26,9 @@ impl SequenceReaction {
         names
     }
     fn react(mods: &mut Mods, refs: Refs, sequence: Rc<Sequence>) {
+        if sequence.is_repeating() {
+            mods.add_sequence(refs.clone(), sequence.clone())
+        }
         mods.produce(refs, sequence.suffix());
     }
 }

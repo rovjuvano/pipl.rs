@@ -67,11 +67,23 @@ fn f(prefix: &Prefix) -> String {
 fn n(name: u8) -> Name {
     Name::from(vec!(name))
 }
+fn _read(channel: &Name, names: &[&Name], repeating: bool) -> Prefix {
+    Prefix::read(channel.clone(), names.iter().map(|&x| x.clone()).collect(), repeating)
+}
 fn read(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::read(channel.clone(), names.iter().map(|&x| x.clone()).collect(), false)
+    _read(channel, names, false)
+}
+fn read_many(channel: &Name, names: &[&Name]) -> Prefix {
+    _read(channel, names, true)
+}
+fn _send(channel: &Name, names: &[&Name], repeating: bool) -> Prefix {
+    Prefix::send(channel.clone(), names.iter().map(|&x| x.clone()).collect(), repeating)
 }
 fn send(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::send(channel.clone(), names.iter().map(|&x| x.clone()).collect(), false)
+    _send(channel, names, false)
+}
+fn send_many(channel: &Name, names: &[&Name]) -> Prefix {
+    _send(channel, names, true)
 }
 fn assert_eq_results(left: Rc<Results>, right: Rc<Results>) {
     use std::iter::Extend;
@@ -141,6 +153,101 @@ fn simplest_mobility() {
     refs_wx.set(y.clone(), x.clone());
     expected.log(f(&read(x, &[y])), refs_wx.clone());
     expected.log(f(&send(z, &[z])), refs_wz.clone());
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn repeating_read_prefix() {
+    // w(a).a(c).w(b).b(c).a(d).b(e).() !w[x].!x[y].()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c, d, e) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64), &n(0x65));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![
+            send(w, &[a]), send(a, &[c]),
+            send(w, &[b]), send(b, &[c]),
+            send(a, &[d]), send(b, &[e]),
+        ],
+        Terminal, actual.clone())
+    );
+    pipl.add(make(vec![read_many(w, &[x]), read_many(x, &[y])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_empty = &mut Refs::new();
+    let refs_wx1 = &mut Refs::new();
+    let refs_wx2 = &mut Refs::new();
+    // w(a).a(c) !w[x].!x[y]
+    expected.log(f(&send(w, &[a])), refs_empty.clone());
+    expected.log(f(&send(a, &[c])), refs_empty.clone());
+    refs_wx1.set(x.clone(), a.clone());
+    expected.log(f(&read_many(w, &[x])), refs_wx1.clone());
+    refs_wx1.set(y.clone(), c.clone());
+    expected.log(f(&read_many(x, &[y])), refs_wx1.clone());
+    pipl.step();
+    pipl.step();
+    // w(b).b(c) !w[x].!x[y]
+    expected.log(f(&send(w, &[b])), refs_empty.clone());
+    expected.log(f(&send(b, &[c])), refs_empty.clone());
+    refs_wx2.set(x.clone(), b.clone());
+    expected.log(f(&read_many(w, &[x])), refs_wx2.clone());
+    refs_wx2.set(y.clone(), c.clone());
+    expected.log(f(&read_many(x, &[y])), refs_wx2.clone());
+    pipl.step();
+    pipl.step();
+    // a(d).b(e) !x[y].()
+    expected.log(f(&send(a, &[d])), refs_empty.clone());
+    expected.log(f(&send(b, &[e])), refs_empty.clone());
+    refs_wx1.set(y.clone(), d.clone());
+    expected.log(f(&read_many(x, &[y])), refs_wx1.clone());
+    refs_wx2.set(y.clone(), e.clone());
+    expected.log(f(&read_many(x, &[y])), refs_wx2.clone());
+    pipl.step();
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn repeating_send_prefix() {
+    // w[a].a[c].w[b].b[c].a[d].b[e].() !w(x).!x(y).()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c, d, e) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64), &n(0x65));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![
+            read(w, &[a]), read(a, &[c]),
+            read(w, &[b]), read(b, &[c]),
+            read(a, &[d]), read(b, &[e]),
+        ],
+        Terminal, actual.clone())
+    );
+    pipl.add(make(vec![send_many(w, &[x]), send_many(x, &[y])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_empty = Refs::new();
+    let refs_wa = &mut Refs::new();
+    // w[a].a[c] !w(x).!x(y)
+    refs_wa.set(a.clone(), x.clone());
+    expected.log(f(&read(w, &[a])), refs_wa.clone());
+    refs_wa.set(c.clone(), y.clone());
+    expected.log(f(&read(a, &[c])), refs_wa.clone());
+    expected.log(f(&send_many(w, &[x])), refs_empty.clone());
+    expected.log(f(&send_many(x, &[y])), refs_empty.clone());
+    pipl.step();
+    pipl.step();
+    // w[b].b[c] !w(x).!x(y)
+    refs_wa.set(b.clone(), x.clone());
+    expected.log(f(&read(w, &[b])), refs_wa.clone());
+    refs_wa.set(c.clone(), y.clone());
+    expected.log(f(&read(b, &[c])), refs_wa.clone());
+    expected.log(f(&send_many(w, &[x])), refs_empty.clone());
+    expected.log(f(&send_many(x, &[y])), refs_empty.clone());
+    pipl.step();
+    pipl.step();
+    // a[d].b[e] !x(y).()
+    refs_wa.set(d.clone(), y.clone());
+    expected.log(f(&read(a, &[d])), refs_wa.clone());
+    refs_wa.set(e.clone(), y.clone());
+    expected.log(f(&read(b, &[e])), refs_wa.clone());
+    expected.log(f(&send_many(x, &[y])), refs_empty.clone());
+    expected.log(f(&send_many(x, &[y])), refs_empty.clone());
+    pipl.step();
     pipl.step();
     assert_eq_results(actual, expected);
 }

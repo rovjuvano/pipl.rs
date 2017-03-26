@@ -16,6 +16,10 @@ impl Sequence {
         self.prefix.channel()
     }
     #[inline]
+    pub fn is_repeating(&self) -> bool {
+        self.prefix.is_repeating()
+    }
+    #[inline]
     pub fn names(&self) -> &Vec<Name> {
         self.prefix.names()
     }
