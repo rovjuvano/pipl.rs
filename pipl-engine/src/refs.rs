@@ -16,6 +16,9 @@ impl Refs {
             self.get(k)
         }).collect()
     }
+    pub fn keys(&self) -> Vec<&Name> {
+        self.refs.keys().collect()
+    }
     pub fn set(&mut self, key: Name, value: Name) {
         self.refs.insert(key, value);
     }

@@ -96,14 +96,29 @@ fn send_many(channel: &Name, names: &[&Name]) -> Prefix {
     _send(channel, names, true)
 }
 fn assert_eq_results(left: Rc<Results>, right: Rc<Results>) {
-    use std::iter::Extend;
-    let mut keys = Vec::new();
-    keys.extend(left.0.borrow().keys().cloned());
-    keys.extend(right.0.borrow().keys().cloned());
-    keys.sort();
-    keys.dedup();
-    for ref key in keys {
-        assert_eq!(left.get(key), right.get(key), "{:?}", key);
+    let mut keys_left = left.0.borrow().keys().cloned().collect::<Vec<_>>();
+    let mut keys_right = right.0.borrow().keys().cloned().collect::<Vec<_>>();
+    keys_left.sort();
+    keys_right.sort();
+    assert_eq!(keys_left, keys_right, "results.keys()");
+    for ref key in keys_left {
+        assert_eq_refs_list(left.get(key), right.get(key), key);
+    }
+}
+fn assert_eq_refs_list(left: Vec<Refs>, right: Vec<Refs>, key: &String) {
+    for (i,(l, r)) in left.iter().zip(right.iter()).enumerate() {
+        assert_eq_refs(l, r, key, i);
+    }
+    assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
+}
+fn assert_eq_refs(left: &Refs, right: &Refs, key: &String, i: usize) {
+    let mut left_keys = left.keys();
+    let mut right_keys = right.keys();
+    left_keys.sort();
+    right_keys.sort();
+    assert_eq!(left_keys, right_keys, "results[{:?}][{:?}].keys()", key, i);
+    for k in left_keys.iter() {
+        assert_eq!(left.get(k), right.get(k), "results[{:?}][{:?}][{:?}]", key, i, k);
     }
 }
 #[test]
