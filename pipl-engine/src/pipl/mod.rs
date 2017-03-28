@@ -9,11 +9,6 @@ use ::reaction::sequence::SequenceReaction;
 use ::refs::Refs;
 use std::collections::HashMap;
 use std::rc::Rc;
-// issue #36497: std::ptr::eq unstable
-#[inline]
-pub fn ref_eq<T: ?Sized>(a: *const T, b: *const T) -> bool {
-    a == b
-}
 #[derive(Debug)]
 pub struct Pipl {
     map: ReactionMap,
@@ -107,7 +102,7 @@ impl ReactionQueue {
     }
     fn remove(&mut self, refs: &Refs) {
         if let Some(i) = self.0.iter().position(|x| {
-            ref_eq(x.refs(), refs)
+            ::ptr_eq(x.refs(), refs)
         }) {
             self.0.remove(i);
         }

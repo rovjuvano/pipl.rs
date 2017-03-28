@@ -23,3 +23,9 @@ mod reaction;
 
 mod refs;
 pub use self::refs::Refs;
+
+// issue #36497: std::ptr::eq unstable
+#[inline]
+pub fn ptr_eq<T: ?Sized>(a: *const T, b: *const T) -> bool {
+    a == b
+}

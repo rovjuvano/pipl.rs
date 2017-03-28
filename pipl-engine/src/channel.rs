@@ -42,16 +42,19 @@ mod tests {
     }
     #[test]
     fn read() {
-        assert_eq!(Channel::read(n(0)), Channel::Read(n(0)));
+        let x = n(0);
+        assert_eq!(Channel::read(x.clone()), Channel::Read(x));
     }
     #[test]
     fn send() {
-        assert_eq!(Channel::send(n(0)), Channel::Send(n(0)));
+        let x = n(0);
+        assert_eq!(Channel::send(x.clone()), Channel::Send(x));
     }
     #[test]
     fn invert() {
-        assert_eq!(Channel::read(n(0)).invert(), Channel::send(n(0)));
-        assert_eq!(Channel::send(n(0)).invert(), Channel::read(n(0)));
+        let (x, y) = (n(0), n(1));
+        assert_eq!(Channel::read(x.clone()).invert(), Channel::send(x));
+        assert_eq!(Channel::send(y.clone()).invert(), Channel::read(y));
     }
     #[test]
     fn translate() {
