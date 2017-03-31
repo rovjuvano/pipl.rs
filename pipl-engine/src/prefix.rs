@@ -8,18 +8,32 @@ pub struct Prefix {
     repeating: bool,
 }
 impl Prefix {
-    pub fn read(channel: Name, names: Vec<Name>, repeating: bool) -> Prefix {
+    pub fn read(channel: Name, names: Vec<Name>) -> Prefix {
         Prefix {
             channel: Channel::read(channel),
             names: names,
-            repeating: repeating,
+            repeating: false,
         }
     }
-    pub fn send(channel: Name, names: Vec<Name>, repeating: bool) -> Prefix {
+    pub fn send(channel: Name, names: Vec<Name>) -> Prefix {
         Prefix {
             channel: Channel::send(channel),
             names: names,
-            repeating: repeating,
+            repeating: false,
+        }
+    }
+    pub fn read_many(channel: Name, names: Vec<Name>) -> Prefix {
+        Prefix {
+            channel: Channel::read(channel),
+            names: names,
+            repeating: true,
+        }
+    }
+    pub fn send_many(channel: Name, names: Vec<Name>) -> Prefix {
+        Prefix {
+            channel: Channel::send(channel),
+            names: names,
+            repeating: true,
         }
     }
     #[inline]
@@ -58,32 +72,32 @@ mod tests {
     }
     #[test]
     fn read_one() {
-        let subject = Prefix::read(n(0), vec![n(1)], false);
+        let subject = Prefix::read(n(0), vec![n(1)]);
         assert_eq!("00[01]", format!("{}", subject));
     }
     #[test]
     fn send_one() {
-        let subject = Prefix::send(n(0), vec![n(1)], false);
+        let subject = Prefix::send(n(0), vec![n(1)]);
         assert_eq!("00(01)", format!("{}", subject));
     }
     #[test]
     fn read_many() {
-        let subject = Prefix::read(n(0), vec![n(1), n(2), n(3)], false);
+        let subject = Prefix::read(n(0), vec![n(1), n(2), n(3)]);
         assert_eq!("00[01, 02, 03]", format!("{}", subject));
     }
     #[test]
     fn send_many() {
-        let subject = Prefix::send(n(0), vec![n(1), n(2), n(3)], false);
+        let subject = Prefix::send(n(0), vec![n(1), n(2), n(3)]);
         assert_eq!("00(01, 02, 03)", format!("{}", subject));
     }
     #[test]
     fn read_repeating() {
-        let subject = Prefix::read(n(0), vec![n(1)], true);
+        let subject = Prefix::read_many(n(0), vec![n(1)]);
         assert_eq!("!00[01]", format!("{}", subject));
     }
     #[test]
     fn send_repeating() {
-        let subject = Prefix::send(n(0), vec![n(1)], true);
+        let subject = Prefix::send_many(n(0), vec![n(1)]);
         assert_eq!("!00(01)", format!("{}", subject));
     }
 }

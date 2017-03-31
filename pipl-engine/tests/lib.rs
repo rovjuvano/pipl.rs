@@ -77,23 +77,20 @@ fn f(prefix: &Prefix) -> String {
 fn n(name: u8) -> Name {
     Name::from(vec!(name))
 }
-fn _read(channel: &Name, names: &[&Name], repeating: bool) -> Prefix {
-    Prefix::read(channel.clone(), names.iter().map(|&x| x.clone()).collect(), repeating)
+fn ref_slice_to_vec<T: Clone>(names: &[&T]) -> Vec<T> {
+    names.iter().map(|&x| x.clone()).collect()
 }
 fn read(channel: &Name, names: &[&Name]) -> Prefix {
-    _read(channel, names, false)
+    Prefix::read(channel.clone(), ref_slice_to_vec(names))
 }
 fn read_many(channel: &Name, names: &[&Name]) -> Prefix {
-    _read(channel, names, true)
-}
-fn _send(channel: &Name, names: &[&Name], repeating: bool) -> Prefix {
-    Prefix::send(channel.clone(), names.iter().map(|&x| x.clone()).collect(), repeating)
+    Prefix::read_many(channel.clone(), ref_slice_to_vec(names))
 }
 fn send(channel: &Name, names: &[&Name]) -> Prefix {
-    _send(channel, names, false)
+    Prefix::send(channel.clone(), ref_slice_to_vec(names))
 }
 fn send_many(channel: &Name, names: &[&Name]) -> Prefix {
-    _send(channel, names, true)
+    Prefix::send_many(channel.clone(), ref_slice_to_vec(names))
 }
 fn assert_eq_results(left: Rc<Results>, right: Rc<Results>) {
     let mut keys_left = left.0.borrow().keys().cloned().collect::<Vec<_>>();
