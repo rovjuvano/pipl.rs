@@ -1,5 +1,5 @@
 extern crate pipl_engine;
-use pipl_engine::{Call, CallProcess, ChoiceProcess, Name, ParallelProcess, Pipl, Prefix, Process, Refs, Sequence};
+use pipl_engine::{Call, Name, Pipl, Prefix, Process, Refs, Sequence};
 use pipl_engine::Process::Terminal;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -46,20 +46,16 @@ fn log<K: Into<String>>(key: K, suffix: Process, results: Rc<Results>) -> Proces
     call(Rc::new(ResultsCall::new(key, results.clone())), suffix)
 }
 fn call(call: Rc<Call>, suffix: Process) -> Process {
-    Process::Call(Rc::new(CallProcess::new(call, suffix)))
+    Process::new_call(call, suffix)
 }
 fn choice(sequences: Vec<Sequence>) -> Process {
-    Process::Choice(Rc::new(ChoiceProcess::new(
-        sequences.into_iter().map(|x| Rc::new(x)).collect()
-    )))
+    Process::new_choice(sequences.into_iter().map(|x| Rc::new(x)).collect())
 }
 fn parallel(sequences: Vec<Sequence>) -> Process {
-    Process::Parallel(Rc::new(ParallelProcess::new(
-        sequences.into_iter().map(|x| Rc::new(x)).collect()
-    )))
+    Process::new_parallel(sequences.into_iter().map(|x| Rc::new(x)).collect())
 }
 fn sequence(prefix: Prefix, suffix: Process) -> Process {
-    Process::Sequence(Rc::new(Sequence::new(prefix, suffix)))
+    Process::new_sequence(prefix, suffix)
 }
 fn make(prefixes: Vec<Prefix>, suffix: Process, results: Rc<Results>) -> Sequence {
     let process = prefixes.into_iter().rev().fold(suffix, |suffix, prefix| {
