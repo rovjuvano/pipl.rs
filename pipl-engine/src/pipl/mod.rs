@@ -61,8 +61,8 @@ impl ReactionMap {
     fn collapse(&mut self, channel: &Channel) -> SequenceReaction {
         let reaction = self.map.get_mut(channel).unwrap().next();
         if Rc::strong_count(&reaction) > 1 {
-            for channel in reaction.channels() {
-                self.remove(channel, reaction.refs());
+            for c in reaction.channels() {
+                self.remove(&c.translate(reaction.refs()), reaction.refs());
             }
         }
         match Rc::try_unwrap(reaction).unwrap() {
