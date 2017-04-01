@@ -2,6 +2,7 @@ use ::channel::Channel;
 use ::pipl::Pipl;
 use ::process::call_process::CallProcess;
 use ::process::choice::ChoiceProcess;
+use ::process::names::Names;
 use ::process::parallel::ParallelProcess;
 use ::process::Process;
 use ::process::sequence::Sequence;
@@ -26,6 +27,7 @@ impl Mods {
         match process {
             &Call(ref p)     => self.call(refs, p.clone()),
             &Choice(ref p)   => self.add_choice(refs, p.clone()),
+            &Names(ref p)    => self.add_names(refs, p.clone()),
             &Parallel(ref p) => self.add_parallel(refs, p.clone()),
             &Sequence(ref p) => self.add_sequence(refs, p.clone()),
             &Terminal        => {},
@@ -39,6 +41,10 @@ impl Mods {
         for c in channels.into_iter() {
             self.new.push((c, reaction.clone()));
         }
+    }
+    fn add_names(&mut self, mut refs: Refs, names: Rc<Names>) {
+        refs.new_names(names.names().clone());
+        self.produce(refs, names.suffix().clone())
     }
     fn add_parallel(&mut self, refs: Refs, parallel: Rc<ParallelProcess>) {
         if let Some((last, head)) = parallel.sequences().split_last() {

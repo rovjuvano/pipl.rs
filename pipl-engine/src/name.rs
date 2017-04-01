@@ -6,6 +6,9 @@ impl Name {
     pub fn dup(&self) -> Self {
         Name::from((*self.0).clone())
     }
+    pub fn raw(&self) -> &Vec<u8> {
+        &*self.0
+    }
 }
 impl fmt::Debug for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -19,6 +19,15 @@ impl Refs {
     pub fn keys(&self) -> Vec<&Name> {
         self.refs.keys().collect()
     }
+    pub fn new_name(&mut self, key: Name) {
+        let value = key.dup();
+        self.set(key, value);
+    }
+    pub fn new_names(&mut self, keys: Vec<Name>) {
+        for k in keys.into_iter() {
+            self.new_name(k);
+        }
+    }
     pub fn set(&mut self, key: Name, value: Name) {
         self.refs.insert(key, value);
     }
@@ -59,6 +68,24 @@ mod tests {
         let actual = subject.get_names(&vec![k1, k2.clone(), k3]);
         let expected = vec![v1, k2, v3];
         assert_eq!(actual, expected);
+    }
+    #[test]
+    fn new_name() {
+        let mut subject = Refs::new();
+        let (k,) = (n(0x01),);
+        subject.new_name(k.clone());
+        assert_ne!(subject.get(&k), k);
+        subject.new_name(k.clone());
+        assert_ne!(subject.get(&k), k);
+    }
+    #[test]
+    fn new_names() {
+        let mut subject = Refs::new();
+        let (k1, k2, k3) = (n(0x01),n(0x02),n(0x03));
+        subject.new_names(vec![k1.clone(), k2.clone(), k3.clone()]);
+        assert_ne!(subject.get(&k1), k1);
+        assert_ne!(subject.get(&k2), k2);
+        assert_ne!(subject.get(&k3), k3);
     }
     #[test]
     fn set() {

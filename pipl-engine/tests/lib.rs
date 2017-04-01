@@ -51,6 +51,9 @@ fn call(call: Rc<Call>, suffix: Process) -> Process {
 fn choice(sequences: Vec<Sequence>) -> Process {
     Process::new_choice(sequences.into_iter().map(|x| Rc::new(x)).collect())
 }
+fn new_names(names: &[&Name], suffix: Process) -> Process {
+    Process::new_names(names.iter().map(|&x| x.clone()).collect(), suffix)
+}
 fn parallel(sequences: Vec<Sequence>) -> Process {
     Process::new_parallel(sequences.into_iter().map(|x| Rc::new(x)).collect())
 }
@@ -153,7 +156,7 @@ fn assert_eq_refs(left: &Refs, right: &Refs, key: &String, i: usize) {
     right_keys.sort();
     assert_eq!(left_keys, right_keys, "results[{:?}][{:?}].keys()", key, i);
     for k in left_keys.iter() {
-        assert_eq!(left.get(k), right.get(k), "results[{:?}][{:?}][{:?}]", key, i, k);
+        assert_eq!(left.get(k).raw(), right.get(k).raw(), "results[{:?}][{:?}][{:?}]", key, i, k);
     }
 }
 #[test]
@@ -416,6 +419,53 @@ fn polyadic() {
     refs_read.set(y.clone(), b.clone());
     expected.log(f(&read(w, &[x, y])), refs_read.clone());
     expected.log(f(&send(w, &[a, b])), refs_empty.clone());
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn new_names_before_parallel() {
+    // w[x].[w, x](| w(c).() x[o].() y[p].x(p).x(p) )
+    // w(a).w[m].() a[n].() x[o].() y(b).()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let (m, n, o, p) = (&n(0x6d), &n(0x6e), &n(0x6f), &n(0x70));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(
+        vec![read(w, &[x])],
+        new_names(&[w, x],
+            parallel(vec![
+                make(vec![send(w, &[c])], Terminal, actual.clone()),
+                make(vec![read(x, &[o])], Terminal, actual.clone()),
+                make(vec![read(y, &[p]), send(x, &[p]), send(x, &[p])], Terminal, actual.clone()),
+            ]),
+        ),
+        actual.clone()
+    ));
+    pipl.add(make(vec![send(w, &[a]), read(w, &[m])], Terminal, actual.clone()));
+    pipl.add(make(vec![read(a, &[n])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(x, &[o])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(y, &[b])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    let refs_yb = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    refs_wx.set(w.clone(), w.dup());
+    refs_wx.set(x.clone(), x.dup());
+    let refs_wxxo = &mut refs_wx.clone();
+    let refs_wxyp = &mut refs_wx.clone();
+    refs_wxyp.set(p.clone(), b.clone());
+    expected.log(f(&read(y, &[p])), refs_wxyp.clone());
+    expected.log(f(&send(y, &[b])), refs_yb.clone());
+    pipl.step();
+    refs_wxxo.set(o.clone(), b.clone());
+    expected.log(f(&read(x, &[o])), refs_wxxo.clone());
+    expected.log(f(&send(x, &[p])), refs_wxyp.clone());
+    pipl.step();
     pipl.step();
     assert_eq_results(actual, expected);
 }
