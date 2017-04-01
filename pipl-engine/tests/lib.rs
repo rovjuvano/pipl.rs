@@ -57,36 +57,78 @@ fn parallel(sequences: Vec<Sequence>) -> Process {
 fn sequence(prefix: Prefix, suffix: Process) -> Process {
     Process::new_sequence(prefix, suffix)
 }
-fn make(prefixes: Vec<Prefix>, suffix: Process, results: Rc<Results>) -> Sequence {
-    let process = prefixes.into_iter().rev().fold(suffix, |suffix, prefix| {
-        let key = f(&prefix);
-        sequence(prefix, log(key, suffix, results.clone()))
+struct P {
+    channel: Name,
+    names: Vec<Name>,
+    repeating: bool,
+    is_read: bool,
+}
+impl P {
+    fn new(channel: &Name, is_read: bool) -> Self {
+        P {
+            channel: channel.clone(),
+            names: Vec::new(),
+            repeating: false,
+            is_read: is_read,
+        }
+    }
+    fn read(channel: &Name) -> Self {
+        Self::new(channel, true)
+    }
+    fn send(channel: &Name) -> Self {
+        Self::new(channel, false)
+    }
+    fn names(mut self, names: &[&Name]) -> Self {
+        self.names.extend(names.iter().map(|&x| x.clone()));
+        self
+    }
+    fn repeating(mut self) -> Self {
+        self.repeating = true;
+        self
+    }
+    fn prefix(&self) -> Prefix {
+        let channel = self.channel.clone();
+        let names = self.names.clone();
+        match (self.repeating, self.is_read) {
+            (true, true)   => Prefix::read_many(channel, names),
+            (true, false)  => Prefix::send_many(channel, names),
+            (false, true)  => Prefix::read(channel, names),
+            (false, false) => Prefix::send(channel, names),
+        }
+    }
+    fn logged_sequence(&self, suffix: Process, results: Rc<Results>) -> Process {
+        let prefix = self.prefix();
+        let key = format!("{}", prefix);
+        let suffix = log(key, suffix, results);
+        sequence(prefix, suffix)
+    }
+}
+fn make(prefixes: Vec<P>, suffix: Process, results: Rc<Results>) -> Sequence {
+    let process = prefixes.into_iter().rev().fold(suffix, |suffix, p| {
+        p.logged_sequence(suffix, results.clone())
     });
     match process {
         Process::Sequence(sequence) => Rc::try_unwrap(sequence).unwrap(),
         _ => unreachable!(),
     }
 }
-fn f(prefix: &Prefix) -> String {
-    format!("{}", &prefix)
+fn f(p: &P) -> String {
+    format!("{}", p.prefix())
 }
 fn n(name: u8) -> Name {
     Name::from(vec!(name))
 }
-fn ref_slice_to_vec<T: Clone>(names: &[&T]) -> Vec<T> {
-    names.iter().map(|&x| x.clone()).collect()
+fn read(channel: &Name, names: &[&Name]) -> P {
+    P::read(channel).names(names)
 }
-fn read(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::read(channel.clone(), ref_slice_to_vec(names))
+fn read_many(channel: &Name, names: &[&Name]) -> P {
+    read(channel, names).repeating()
 }
-fn read_many(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::read_many(channel.clone(), ref_slice_to_vec(names))
+fn send(channel: &Name, names: &[&Name]) -> P {
+    P::send(channel).names(names)
 }
-fn send(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::send(channel.clone(), ref_slice_to_vec(names))
-}
-fn send_many(channel: &Name, names: &[&Name]) -> Prefix {
-    Prefix::send_many(channel.clone(), ref_slice_to_vec(names))
+fn send_many(channel: &Name, names: &[&Name]) -> P {
+    send(channel, names).repeating()
 }
 fn assert_eq_results(left: Rc<Results>, right: Rc<Results>) {
     let mut keys_left = left.0.borrow().keys().cloned().collect::<Vec<_>>();
