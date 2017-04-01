@@ -18,13 +18,15 @@ impl SequenceReaction {
     }
     pub fn input(self, mods: &mut Mods, names: Vec<Name>) {
         let SequenceReaction { mut refs, sequence } = self;
+        refs.new_names(sequence.new_names().clone());
         if sequence.suffix().is_nonterminal() {
             refs.set_names(sequence.names().clone(), names);
         }
         Self::react(mods, refs, sequence);
     }
     pub fn output(self, mods: &mut Mods) -> Vec<Name> {
-        let SequenceReaction { refs, sequence } = self;
+        let SequenceReaction { mut refs, sequence } = self;
+        refs.new_names(sequence.new_names().clone());
         let names = refs.get_names(sequence.names());
         Self::react(mods, refs, sequence);
         names

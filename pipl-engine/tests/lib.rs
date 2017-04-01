@@ -57,12 +57,13 @@ fn new_names(names: &[&Name], suffix: Process) -> Process {
 fn parallel(sequences: Vec<Sequence>) -> Process {
     Process::new_parallel(sequences.into_iter().map(|x| Rc::new(x)).collect())
 }
-fn sequence(prefix: Prefix, suffix: Process) -> Process {
-    Process::new_sequence(prefix, suffix)
+fn sequence(names: Vec<Name>, prefix: Prefix, suffix: Process) -> Process {
+    Process::new_sequence(names, prefix, suffix)
 }
 struct P {
     channel: Name,
     names: Vec<Name>,
+    new_names: Vec<Name>,
     repeating: bool,
     is_read: bool,
 }
@@ -71,6 +72,7 @@ impl P {
         P {
             channel: channel.clone(),
             names: Vec::new(),
+            new_names: Vec::new(),
             repeating: false,
             is_read: is_read,
         }
@@ -83,6 +85,10 @@ impl P {
     }
     fn names(mut self, names: &[&Name]) -> Self {
         self.names.extend(names.iter().map(|&x| x.clone()));
+        self
+    }
+    fn new_names(mut self, names: &[&Name]) -> Self {
+        self.new_names.extend(names.iter().map(|&x| x.clone()));
         self
     }
     fn repeating(mut self) -> Self {
@@ -103,7 +109,7 @@ impl P {
         let prefix = self.prefix();
         let key = format!("{}", prefix);
         let suffix = log(key, suffix, results);
-        sequence(prefix, suffix)
+        sequence(self.new_names.clone(), prefix, suffix)
     }
 }
 fn make_p(prefixes: Vec<P>, suffix: Process, results: Rc<Results>) -> Process {
@@ -443,6 +449,71 @@ fn new_names_before_sequence() {
         ),
         actual.clone()
     ));
+    pipl.add(make(vec![send(w, &[a]), read(y, &[m]), read(a, &[n]), read(x, &[o])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    let w2 = &w.dup();
+    refs_wx.set(w.clone(), w2.clone());
+    refs_wx.set(x.clone(), x.dup());
+    refs_wa.set(m.clone(), w2.clone());
+    expected.log(f(&read(y, &[m])), refs_wa.clone());
+    expected.log(f(&send(y, &[w])), refs_wx.clone());
+    pipl.step();
+    refs_wa.set(n.clone(), b.clone());
+    expected.log(f(&read(a, &[n])), refs_wa.clone());
+    expected.log(f(&send(a, &[b])), refs_wx.clone());
+    pipl.step();
+    pipl.step();
+    assert_eq_results(actual.clone(), expected);
+    assert_ne_names(&actual.get(&f(&send(y, &[w]))).get(0).unwrap().get(w), w);
+    assert_ne_names(&actual.get(&f(&read(y, &[m]))).get(0).unwrap().get(m), w);
+}
+#[test]
+fn new_names_in_read() {
+    // w[x].y(w).a(b).x(c).() w(a).[w, x]y[m].a[n].x[o].()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![read(w, &[x]), send(y, &[w]), send(a, &[b]), send(x, &[c])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(w, &[a]), read(y, &[m]).new_names(&[w, x]), read(a, &[n]), read(x, &[o])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    refs_wa.set(w.clone(), w.dup());
+    refs_wa.set(x.clone(), x.dup());
+    refs_wa.set(m.clone(), w.clone());
+    expected.log(f(&read(y, &[m])), refs_wa.clone());
+    expected.log(f(&send(y, &[w])), refs_wx.clone());
+    pipl.step();
+    refs_wa.set(n.clone(), b.clone());
+    expected.log(f(&read(a, &[n])), refs_wa.clone());
+    expected.log(f(&send(a, &[b])), refs_wx.clone());
+    pipl.step();
+    pipl.step();
+    assert_eq_results(actual.clone(), expected);
+    assert_ne_names(&actual.get(&f(&read(y, &[m]))).get(0).unwrap().get(w), w);
+    assert_eq!(&actual.get(&f(&read(y, &[m]))).get(0).unwrap().get(m), w);
+}
+#[test]
+fn new_names_in_send() {
+    // w[x].[w, x]y(w).a(b).x(c).() w(a).y[m].a[n].x[o].()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![read(w, &[x]), send(y, &[w]).new_names(&[w, x]), send(a, &[b]), send(x, &[c])], Terminal, actual.clone()));
     pipl.add(make(vec![send(w, &[a]), read(y, &[m]), read(a, &[n]), read(x, &[o])], Terminal, actual.clone()));
     let expected = Rc::new(Results::new());
     let refs_wx = &mut Refs::new();

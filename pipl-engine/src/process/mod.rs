@@ -39,8 +39,8 @@ impl Process {
     pub fn new_parallel(sequences: Vec<Rc<Sequence>>) -> Process {
         Process::Parallel(Rc::new(ParallelProcess::new(sequences)))
     }
-    pub fn new_sequence(prefix: Prefix, suffix: Process) -> Process {
-        Process::Sequence(Rc::new(Sequence::new(prefix, suffix)))
+    pub fn new_sequence(names: Vec<Name>, prefix: Prefix, suffix: Process) -> Process {
+        Process::Sequence(Rc::new(Sequence::new(names, prefix, suffix)))
     }
     pub fn is_nonterminal(&self) -> bool {
         match self {
