@@ -72,9 +72,13 @@ impl ReactionMap {
     }
     fn next(&mut self) -> Option<(SequenceReaction, SequenceReaction)> {
         if let Some(name) = self.queue.next() {
-            let reader = self.collapse(&Channel::Read(name.clone()));
-            let sender = self.collapse(&Channel::Send(name.clone()));
-            Some((reader, sender))
+            let read = &Channel::Read(name.clone());
+            let send = &Channel::Send(name.clone());
+            if self.still_ready(read, send) {
+                Some((self.collapse(read), self.collapse(send)))
+            } else {
+                self.next()
+            }
         } else {
             None
         }
@@ -82,6 +86,12 @@ impl ReactionMap {
     fn remove(&mut self, channel: &Channel, refs: &Refs) {
         if let Some(queue) = self.map.get_mut(channel) {
             queue.remove(refs);
+        }
+    }
+    fn still_ready(&self, read: &Channel, send: &Channel) -> bool {
+        match (self.map.get(read), self.map.get(send)) {
+            (Some(read_q), Some(send_q)) => read_q.is_ready() && send_q.is_ready(),
+            _ => false,
         }
     }
 }

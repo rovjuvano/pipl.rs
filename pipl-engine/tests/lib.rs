@@ -539,6 +539,138 @@ fn new_names_in_send() {
     assert_ne_names(&actual.get(&f(&read(y, &[m]))).get(0).unwrap().get(m), w);
 }
 #[test]
+fn new_names_in_repeating_read() {
+    // w[x].w[y].y(b).x(c).() ![a]z[].w(a).a[x].() !a(d).() z().z().()
+    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
+    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![read(w, &[x]), read(w, &[y]), send(y, &[b]), send(x, &[c])], Terminal, actual.clone()));
+    pipl.add(make(vec![read_many(z, &[]).new_names(&[a]), send(w, &[a]), read(a, &[x])], Terminal, actual.clone()));
+    pipl.add(make(vec![send_many(a, &[d])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(z, &[]), send(z, &[])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_empty = Refs::new();
+    let refs_wx = &mut Refs::new();
+    let refs_wax = &mut Refs::new();
+    let refs_way = &mut Refs::new();
+    refs_wax.set(a.clone(), a.dup());
+    refs_way.set(a.clone(), a.dup());
+    expected.log(f(&read_many(z, &[])), refs_wax.clone());
+    expected.log(f(&read_many(z, &[])), refs_way.clone());
+    expected.log(f(&send(z, &[])), refs_empty.clone());
+    expected.log(f(&send(z, &[])), refs_empty.clone());
+    pipl.step();
+    pipl.step();
+    refs_wx.set(x.clone(), a.dup());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wax.clone());
+    pipl.step();
+    refs_wx.set(y.clone(), a.dup());
+    expected.log(f(&read(w, &[y])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_way.clone());
+    pipl.step();
+    refs_way.set(x.clone(), b.clone());
+    expected.log(f(&send(y, &[b])), refs_wx.clone());
+    expected.log(f(&read(a, &[x])), refs_way.clone());
+    pipl.step();
+    refs_wax.set(x.clone(), c.clone());
+    expected.log(f(&send(x, &[c])), refs_wx.clone());
+    expected.log(f(&read(a, &[x])), refs_wax.clone());
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn new_names_in_repeating_send() {
+    // w[x].w[y].y(b).x(c).() ![a]w(a).a[x].() !a(d).()
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![read(w, &[x]), read(w, &[y]), send(y, &[b]), send(x, &[c])], Terminal, actual.clone()));
+    pipl.add(make(vec![send_many(w, &[a]).new_names(&[a]), read(a, &[x])], Terminal, actual.clone()));
+    pipl.add(make(vec![send_many(a, &[d])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wax = &mut Refs::new();
+    let refs_way = &mut Refs::new();
+    refs_wx.set(x.clone(), a.dup());
+    refs_wax.set(a.clone(), a.dup());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send_many(w, &[a])), refs_wax.clone());
+    pipl.step();
+    refs_wx.set(y.clone(), a.dup());
+    refs_way.set(a.clone(), a.dup());
+    expected.log(f(&read(w, &[y])), refs_wx.clone());
+    expected.log(f(&send_many(w, &[a])), refs_way.clone());
+    pipl.step();
+    refs_way.set(x.clone(), b.clone());
+    expected.log(f(&send(y, &[b])), refs_wx.clone());
+    expected.log(f(&read(a, &[x])), refs_way.clone());
+    pipl.step();
+    refs_wax.set(x.clone(), c.clone());
+    expected.log(f(&send(x, &[c])), refs_wx.clone());
+    expected.log(f(&read(a, &[x])), refs_wax.clone());
+    pipl.step();
+    assert_eq_results(actual, expected);
+}
+#[test]
+fn new_names_in_prefix_do_not_affect_channel() {
+    // [w]w[m].(+ [x]x[n].(| [y]y[o].() ) )
+    // [w]w(a).(+ [x]x(b).(| [y]y(c).() ) )
+    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
+    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![read(w, &[m]).new_names(&[w])], choice(vec![
+        make(vec![read(x, &[n]).new_names(&[x])], parallel(vec![
+                make(vec![read(y, &[o]).new_names(&[y])], Terminal, actual.clone())
+            ]),
+            actual.clone()
+        )]),
+        actual.clone()
+    ));
+    pipl.add(make(vec![send(w, &[a]).new_names(&[w])], choice(vec![
+            make(vec![send(x, &[b]).new_names(&[x])], parallel(vec![
+                make(vec![send(y, &[c]).new_names(&[y])], Terminal, actual.clone())
+            ]),
+            actual.clone()
+        )]),
+        actual.clone()
+    ));
+    let expected = Rc::new(Results::new());
+    let refs_wm = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    refs_wm.set(w.clone(), w.dup());
+    refs_wm.set(m.clone(), a.clone());
+    refs_wa.set(w.clone(), w.dup());
+    expected.log(f(&read(w, &[m])), refs_wm.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    refs_wm.set(x.clone(), x.dup());
+    refs_wm.set(n.clone(), b.clone());
+    refs_wa.set(x.clone(), x.dup());
+    expected.log(f(&read(x, &[n])), refs_wm.clone());
+    expected.log(f(&send(x, &[b])), refs_wa.clone());
+    pipl.step();
+    refs_wm.set(y.clone(), y.dup());
+    refs_wm.set(o.clone(), c.clone());
+    refs_wa.set(y.clone(), y.dup());
+    expected.log(f(&read(y, &[o])), refs_wm.clone());
+    expected.log(f(&send(y, &[c])), refs_wa.clone());
+    pipl.step();
+    // assert_eq_results(actual.clone(), expected);
+    let refs_yo = actual.get(&f(&read(y, &[o]))).get(0).unwrap().clone();
+    let refs_yc = actual.get(&f(&send(y, &[c]))).get(0).unwrap().clone();
+    assert_ne_names(&refs_yo.get(w), w);
+    assert_ne_names(&refs_yc.get(w), w);
+    assert_ne_names(&refs_yo.get(x), x);
+    assert_ne_names(&refs_yc.get(x), x);
+    assert_ne_names(&refs_yo.get(y), y);
+    assert_ne_names(&refs_yc.get(y), y);
+}
+#[test]
 fn new_names_before_parallel() {
     // w[x].[w, x](| w(c).() x[o].() y[p].x(p).x(p) )
     // w(a).w[m].() a[n].() x[o].() y(b).()
@@ -626,4 +758,98 @@ fn new_names_before_choice() {
     pipl.step();
     pipl.step();
     assert_eq_results(actual, expected);
+}
+#[test]
+fn new_names_in_parallel_prefixes() {
+    // w[x].(| [x]w(x).x(b).() [a]w[y].a(c).() x[z].() ) w(a).a[z].()
+    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
+    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(
+        vec![read(w, &[x])],
+        parallel(vec![
+            make(vec![send(w, &[x]).new_names(&[x]), send(x, &[b])], Terminal, actual.clone()),
+            make(vec![read(w, &[y]).new_names(&[a]), send(a, &[c])], Terminal, actual.clone()),
+            make(vec![read(x, &[z])], Terminal, actual.clone()),
+        ]),
+        actual.clone()
+    ));
+    pipl.add(make(vec![send(w, &[a]), read(a, &[z])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    let refs_wxwx = &mut refs_wx.clone();
+    let refs_wxwy = &mut refs_wx.clone();
+    let x2 = x.dup();
+    refs_wxwx.set(x.clone(), x2.clone());
+    refs_wxwy.set(y.clone(), x2.clone());
+    refs_wxwy.set(a.clone(), a.dup());
+    expected.log(f(&read(w, &[y])), refs_wxwy.clone());
+    expected.log(f(&send(w, &[x])), refs_wxwx.clone());
+    pipl.step();
+    pipl.step();
+    assert_eq_results(actual.clone(), expected);
+    assert_ne_names(&actual.get(&f(&read(w, &[y]))).get(0).unwrap().get(a), a);
+    assert_ne_names(&actual.get(&f(&send(w, &[x]))).get(0).unwrap().get(x), x);
+    assert_eq!(
+        &actual.get(&f(&read(w, &[y]))).get(0).unwrap().get(y),
+        &actual.get(&f(&send(w, &[x]))).get(0).unwrap().get(x)
+    );
+}
+#[test]
+fn new_names_in_choice_prefixes() {
+    // w[x].(+ [m]w[y].y(m).m(b).() )
+    // w(a).(+ [n]w(n).n[o].o[p].() )
+    // m[z].() n(c).() o(d).()
+    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
+    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let (m, n, o, p) = (&n(0x6d), &n(0x6e), &n(0x6f), &n(0x70));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(
+        vec![read(w, &[x])],
+        choice(vec![
+            make(vec![read(w, &[y]).new_names(&[m]), send(y, &[m]), send(m, &[b])],Terminal, actual.clone()),
+        ]),
+        actual.clone()
+    ));
+    pipl.add(make(
+        vec![send(w, &[a])],
+        choice(vec![
+            make(vec![send(w, &[n]).new_names(&[n]), read(n, &[o]), read(o, &[p])],Terminal, actual.clone()),
+        ]),
+        actual.clone()
+    ));
+    pipl.add(make(vec![read(m, &[z])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(n, &[c])], Terminal, actual.clone()));
+    pipl.add(make(vec![send(o, &[d])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wa = &mut Refs::new();
+    refs_wx.set(x.clone(), a.clone());
+    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log(f(&send(w, &[a])), refs_wa.clone());
+    pipl.step();
+    let m2 = m.dup();
+    let n2 = n.dup();
+    refs_wx.set(m.clone(), m2.clone());
+    refs_wx.set(y.clone(), n2.clone());
+    refs_wa.set(n.clone(), n2.clone());
+    expected.log(f(&read(w, &[y])), refs_wx.clone());
+    expected.log(f(&send(w, &[n])), refs_wa.clone());
+    pipl.step();
+    refs_wa.set(o.clone(), m2.clone());
+    expected.log(f(&read(n, &[o])), refs_wa.clone());
+    expected.log(f(&send(y, &[m])), refs_wx.clone());
+    pipl.step();
+    refs_wa.set(p.clone(), b.clone());
+    expected.log(f(&read(o, &[p])), refs_wa.clone());
+    expected.log(f(&send(m, &[b])), refs_wx.clone());
+    pipl.step();
+    assert_eq_results(actual.clone(), expected);
 }
