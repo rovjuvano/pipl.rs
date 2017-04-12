@@ -1,6 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
-#[derive(Clone, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Eq, Hash)]
 pub struct Name(Rc<Vec<u8>>);
 impl Name {
     pub fn dup(&self) -> Self {

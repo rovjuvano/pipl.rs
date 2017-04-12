@@ -2,7 +2,9 @@ extern crate pipl_engine;
 use pipl_engine::{Call, Name, Pipl, Prefix, Process, Refs, Sequence};
 use pipl_engine::Process::Terminal;
 use std::cell::RefCell;
+use std::hash::Hash;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 #[derive(Debug, Eq, PartialEq)]
 struct Results(RefCell<HashMap<String, Vec<Refs>>>);
@@ -141,13 +143,17 @@ fn send(channel: &Name, names: &[&Name]) -> P {
 fn send_many(channel: &Name, names: &[&Name]) -> P {
     send(channel, names).repeating()
 }
+fn diff<'a, T: Eq + Hash>(left: &'a HashSet<T>, right: &'a HashSet<T>) -> (HashSet<&'a T>, HashSet<&'a T>) {
+    let diff_left = left.difference(&right).collect::<HashSet<_>>();
+    let diff_right = right.difference(&left).collect::<HashSet<_>>();
+    (diff_left, diff_right)
+}
 fn assert_eq_results(left: Rc<Results>, right: Rc<Results>) {
-    let mut keys_left = left.0.borrow().keys().cloned().collect::<Vec<_>>();
-    let mut keys_right = right.0.borrow().keys().cloned().collect::<Vec<_>>();
-    keys_left.sort();
-    keys_right.sort();
-    assert_eq!(keys_left, keys_right, "results.keys()");
-    for ref key in keys_left {
+    let keys_left = left.0.borrow().keys().cloned().collect::<HashSet<_>>();
+    let keys_right = right.0.borrow().keys().cloned().collect::<HashSet<_>>();
+    let (diff_left, diff_right) = diff(&keys_left, &keys_right);
+    assert_eq!(diff_left, diff_right, "results.keys()");
+    for ref key in keys_left.iter() {
         assert_eq_refs_list(left.get(key), right.get(key), key);
     }
 }
@@ -158,12 +164,13 @@ fn assert_eq_refs_list(left: Vec<Refs>, right: Vec<Refs>, key: &String) {
     assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
 }
 fn assert_eq_refs(left: &Refs, right: &Refs, key: &String, i: usize) {
-    let mut left_keys = left.keys();
-    let mut right_keys = right.keys();
-    left_keys.sort();
-    right_keys.sort();
-    assert_eq!(left_keys, right_keys, "results[{:?}][{:?}].keys()", key, i);
-    for k in left_keys.iter() {
+    let keys_left = left.keys();
+    let keys_right = right.keys();
+    let keys_left = keys_left.iter().collect::<HashSet<_>>();
+    let keys_right = keys_right.iter().collect::<HashSet<_>>();
+    let (diff_left, diff_right) = diff(&keys_left, &keys_right);
+    assert_eq!(diff_left, diff_right, "results[{:?}][{:?}].keys()", key, i);
+    for k in keys_left.iter() {
         assert_eq!(left.get(k).raw(), right.get(k).raw(), "results[{:?}][{:?}][{:?}]", key, i, k);
     }
 }
