@@ -42,27 +42,27 @@ mod tests {
     use super::Name;
     use super::Refs;
     fn n(name: u8) -> Name {
-        Name::from(vec!(name))
+        Name::new(name)
     }
     #[test]
     fn get_default() {
         let subject = Refs::new();
-        let k = n(0x01);
+        let k = n(1);
         assert_eq!(subject.get(&k), k.clone());
     }
     #[test]
     fn get_value() {
         let mut subject = Refs::new();
-        let (k, v) = (n(0x01), n(0x02));
+        let (k, v) = (n(1), n(2));
         subject.refs.insert(k.clone(), v.clone());
         assert_eq!(subject.get(&k), v.clone());
     }
     #[test]
     fn get_names() {
         let mut subject = Refs::new();
-        let (k1, v1) = (n(0x01), n(0x02));
-        let (k2,)    = (n(0x02),);
-        let (k3, v3) = (n(0x03), n(0x03));
+        let (k1, v1) = (n(1), n(2));
+        let (k2,)    = (n(2),);
+        let (k3, v3) = (n(3), n(3));
         subject.refs.insert(k1.clone(), v1.clone());
         subject.refs.insert(k3.clone(), v3.clone());
         let actual = subject.get_names(&vec![k1, k2.clone(), k3]);
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn new_name() {
         let mut subject = Refs::new();
-        let (k,) = (n(0x01),);
+        let (k,) = (n(1),);
         subject.new_name(k.clone());
         assert_ne!(subject.get(&k), k);
         subject.new_name(k.clone());
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn new_names() {
         let mut subject = Refs::new();
-        let (k1, k2, k3) = (n(0x01),n(0x02),n(0x03));
+        let (k1, k2, k3) = (n(1), n(2), n(3));
         subject.new_names(vec![k1.clone(), k2.clone(), k3.clone()]);
         assert_ne!(subject.get(&k1), k1);
         assert_ne!(subject.get(&k2), k2);
@@ -90,16 +90,16 @@ mod tests {
     #[test]
     fn set() {
         let mut subject = Refs::new();
-        let (k, v) = (n(0x01), n(0x02));
+        let (k, v) = (n(1), n(2));
         subject.set(k.clone(), v.clone());
         assert_eq!(subject.refs.get(&k), Some(&v));
     }
     #[test]
     fn set_names() {
         let mut subject = Refs::new();
-        let (k1, v1) = (n(0x0A), n(0x01));
-        let (k2, v2) = (n(0x0B), n(0x02));
-        let (k3, v3) = (n(0x0C), n(0x03));
+        let (k1, v1) = (n(11), n(1));
+        let (k2, v2) = (n(12), n(2));
+        let (k3, v3) = (n(13), n(3));
         let keys = vec![k1.clone(), k2.clone(), k3.clone()];
         let values = vec![v1.clone(), v2.clone(), v3.clone()];
         subject.set_names(keys, values);
@@ -110,8 +110,8 @@ mod tests {
     #[test]
     fn set_names_short_keys() {
         let mut subject = Refs::new();
-        let (k1, v1) = (n(0x0A), n(0x01));
-        let (k2, v2) = (n(0x0B), n(0x02));
+        let (k1, v1) = (n(11), n(1));
+        let (k2, v2) = (n(12), n(2));
         let keys = vec![k1.clone()];
         let values = vec![v1.clone(), v2.clone()];
         subject.set_names(keys, values);
@@ -121,8 +121,8 @@ mod tests {
     #[test]
     fn set_names_short_values() {
         let mut subject = Refs::new();
-        let (k1, v1) = (n(0x0A), n(0x01));
-        let (k2,) = (n(0x0B),);
+        let (k1, v1) = (n(11), n(1));
+        let (k2,) = (n(12),);
         let keys = vec![k1.clone(), k2.clone()];
         let values = vec![v1.clone()];
         subject.set_names(keys, values);

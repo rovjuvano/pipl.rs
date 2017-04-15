@@ -1,32 +1,51 @@
+use std::any::TypeId;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::rc::Rc;
-#[derive(Clone, Eq, Hash)]
-pub struct Name(Rc<Vec<u8>>);
-impl Name {
-    pub fn dup(&self) -> Self {
-        Name::from((*self.0).clone())
+pub trait NameValue: fmt::Debug + 'static {
+    fn get_type_id(&self) -> TypeId;
+}
+impl<T: fmt::Debug + 'static + ?Sized> NameValue for T {
+    fn get_type_id(&self) -> TypeId { TypeId::of::<T>() }
+}
+impl NameValue {
+    #[inline]
+    pub fn is<T: NameValue>(&self) -> bool {
+        TypeId::of::<T>() == self.get_type_id()
     }
-    pub fn raw(&self) -> &Vec<u8> {
-        &*self.0
+    #[inline]
+    pub fn downcast_ref<T: NameValue>(&self) -> Option<&T> {
+        if self.is::<T>() {
+            unsafe {
+                Some(&*(self as *const NameValue as *const T))
+            }
+        } else {
+            None
+        }
+    }
+}
+#[derive(Clone)]
+pub struct Name(Rc<Rc<NameValue>>);
+impl Name {
+    pub fn new<T: fmt::Debug + 'static>(name: T) -> Self {
+        Name(Rc::new(Rc::new(name)))
+    }
+    pub fn dup(&self) -> Self {
+        Name(Rc::new((*self.0).clone()))
+    }
+    pub fn raw(&self) -> &NameValue {
+        &**self.0
     }
 }
 impl fmt::Debug for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Name({})", self)
+        write!(f, "Name({:?})", &*self.0)
     }
 }
-impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let name = self.0.iter().map(|x| {
-            format!("{:02X}", x)
-        }).collect::<Vec<_>>()
-        .join("");
-        write!(f, "{}", name)
-    }
-}
-impl From<Vec<u8>> for Name {
-    fn from(name: Vec<u8>) -> Self {
-        Name(Rc::new(name))
+impl Hash for Name {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (&*self.0 as * const _).hash(state);
     }
 }
 impl PartialEq for Name {
@@ -34,35 +53,13 @@ impl PartialEq for Name {
         ::ptr_eq(&*self.0, &*other.0)
     }
 }
+impl Eq for Name {}
 #[cfg(test)]
 mod tests {
     use super::Name;
-    fn n(name: Vec<u8>) -> Name {
-        Name::from(name)
-    }
-    #[test]
-    fn one() {
-        assert_eq!("01", format!("{}", n(vec![0x01])));
-    }
-    #[test]
-    fn two() {
-        assert_eq!("0123", format!("{}", n(vec![0x01, 0x23])));
-    }
-    #[test]
-    fn three() {
-        assert_eq!("012345", format!("{}", n(vec![0x01, 0x23, 0x45])));
-    }
-    #[test]
-    fn many() {
-        assert_eq!("0123456789ABCDEF", format!("{}", n(vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef])));
-    }
-    #[test]
-    fn debug() {
-        assert_eq!("Name(01EF)", format!("{:?}", n(vec![0x01, 0xef])))
-    }
     #[test]
     fn clone_vs_dup() {
-        let name = n(vec![0x01]);
+        let name = Name::new(());
         assert_eq!(name, name.clone());
         assert_ne!(name, name.dup());
     }

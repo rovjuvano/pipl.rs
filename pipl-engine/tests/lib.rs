@@ -2,6 +2,7 @@ extern crate pipl_engine;
 use pipl_engine::{Call, Name, Pipl, Prefix, Process, Refs, Sequence};
 use pipl_engine::Process::Terminal;
 use std::cell::RefCell;
+use std::fmt;
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -109,7 +110,7 @@ impl P {
     }
     fn logged_sequence(&self, suffix: Process, results: Rc<Results>) -> Process {
         let prefix = self.prefix();
-        let key = format!("{}", prefix);
+        let key = format!("{:?}", prefix);
         let suffix = log(key, suffix, results);
         sequence(self.new_names.clone(), prefix, suffix)
     }
@@ -126,10 +127,10 @@ fn make(prefixes: Vec<P>, suffix: Process, results: Rc<Results>) -> Sequence {
     }
 }
 fn f(p: &P) -> String {
-    format!("{}", p.prefix())
+    format!("{:?}", p.prefix())
 }
-fn n(name: u8) -> Name {
-    Name::from(vec!(name))
+fn n<T: fmt::Debug +'static>(name: T) -> Name {
+    Name::new(name)
 }
 fn read(channel: &Name, names: &[&Name]) -> P {
     P::read(channel).names(names)
@@ -171,18 +172,47 @@ fn assert_eq_refs(left: &Refs, right: &Refs, key: &String, i: usize) {
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
     assert_eq!(diff_left, diff_right, "results[{:?}][{:?}].keys()", key, i);
     for k in keys_left.iter() {
-        assert_eq!(left.get(k).raw(), right.get(k).raw(), "results[{:?}][{:?}][{:?}]", key, i, k);
+        let left_name = &left.get(k);
+        let right_name = &right.get(k);
+        let message = &format!("results[{:?}][{:?}][{:?}]", key, i, k);
+        if left_name.raw().is::<&str>() {
+            assert_eq_name_values::<&str>(left_name, right_name, message);
+        }
+        else if left_name.raw().is::<char>() {
+            assert_eq_name_values::<char>(left_name, right_name, message);
+        }
+        else {
+            assert!(false, "unrecognized type for NameValue: {:?}", left_name);
+        }
     }
 }
-fn assert_ne_names(a: &Name, b: &Name) {
-    assert_eq!(a.raw(), b.raw());
-    assert_ne!(a, b);
+fn assert_eq_name_values<T: fmt::Debug + Eq + PartialEq + 'static>(left: &Name, right: &Name, message: &String) {
+    assert_ne!(None, left.raw().downcast_ref::<T>());
+    assert_eq!(
+        left.raw().downcast_ref::<T>(),
+        right.raw().downcast_ref::<T>(),
+        "{}",
+        message
+    );
+}
+fn assert_ne_names(left: &Name, right: &Name) {
+    if left.raw().is::<&str>() {
+        assert_ne_name_values::<&str>(left, right);
+    }
+    else {
+        assert!(false, "unrecognized type for NameValue: {:?}", left);
+    }
+    assert_ne!(left, right);
+}
+fn assert_ne_name_values<T: fmt::Debug + Eq + PartialEq + 'static>(left: &Name, right: &Name) {
+    assert_ne!(None, left.raw().downcast_ref::<T>());
+    assert_eq!(left.raw().downcast_ref::<T>(), right.raw().downcast_ref::<T>());
 }
 #[test]
 fn simplest_reaction() {
     // w[x] w(a)
-    let (w, x) = (&n(0x77), &n(0x78));
-    let a = &n(0x61);
+    let (w, x) = (&n("w"), &n("x"));
+    let a = &n("a");
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x])], Terminal, actual.clone()));
@@ -198,8 +228,8 @@ fn simplest_reaction() {
 #[test]
 fn multi_step_reaction() {
     // w[x].w[y] w(a).w(b)
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b) = (&n(0x61), &n(0x62));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b) = (&n("a"), &n("b"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x]), read(w, &[y])], Terminal, actual.clone()));
@@ -219,7 +249,7 @@ fn multi_step_reaction() {
 #[test]
 fn simplest_mobility() {
     // w(x).x[y].() w[z].z(z).()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![send(w, &[x]), read(x, &[y])], Terminal, actual.clone()));
@@ -241,8 +271,8 @@ fn simplest_mobility() {
 #[test]
 fn repeating_read_prefix() {
     // w(a).a(c).w(b).b(c).a(d).b(e).() !w[x].!x[y].()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c, d, e) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64), &n(0x65));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c, d, e) = (&n("a"), &n("b"), &n("c"), &n("d"), &n("e"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![
@@ -289,8 +319,8 @@ fn repeating_read_prefix() {
 #[test]
 fn repeating_send_prefix() {
     // w[a].a[c].w[b].b[c].a[d].b[e].() !w(x).!x(y).()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c, d, e) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64), &n(0x65));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c, d, e) = (&n("a"), &n("b"), &n("c"), &n("d"), &n("e"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![
@@ -336,8 +366,8 @@ fn repeating_send_prefix() {
 #[test]
 fn terminate_parallel() {
     // w[x].(| x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
-    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -373,8 +403,8 @@ fn terminate_parallel() {
 #[test]
 fn terminate_choice() {
     // w[x].(+ x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
-    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -406,8 +436,8 @@ fn terminate_choice() {
 #[test]
 fn no_names() {
     // w[].x().() w(a).x[b].()
-    let (w, x) = (&n(0x77), &n(0x78));
-    let (a, b) = (&n(0x61), &n(0x62));
+    let (w, x) = (&n("w"), &n("x"));
+    let (a, b) = (&n("a"), &n("b"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[]), send(x, &[])], Terminal, actual.clone()));
@@ -425,8 +455,8 @@ fn no_names() {
 #[test]
 fn polyadic() {
     // w[x,y].() w(a,b).()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b) = (&n(0x61), &n(0x62));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b) = (&n("a"), &n("b"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x, y])], Terminal, actual.clone()));
@@ -444,9 +474,9 @@ fn polyadic() {
 #[test]
 fn new_names_before_sequence() {
     // w[x].[w, x].y(w).a(b).x(c).() w(a).y[m].a[n].x[o].()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -483,9 +513,9 @@ fn new_names_before_sequence() {
 #[test]
 fn new_names_in_read() {
     // w[x].y(w).a(b).x(c).() w(a).[w, x]y[m].a[n].x[o].()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x]), send(y, &[w]), send(a, &[b]), send(x, &[c])], Terminal, actual.clone()));
@@ -515,9 +545,9 @@ fn new_names_in_read() {
 #[test]
 fn new_names_in_send() {
     // w[x].[w, x]y(w).a(b).x(c).() w(a).y[m].a[n].x[o].()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x]), send(y, &[w]).new_names(&[w, x]), send(a, &[b]), send(x, &[c])], Terminal, actual.clone()));
@@ -548,8 +578,8 @@ fn new_names_in_send() {
 #[test]
 fn new_names_in_repeating_read() {
     // w[x].w[y].y(b).x(c).() ![a]z[].w(a).a[x].() !a(d).() z().z().()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
-    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x]), read(w, &[y]), send(y, &[b]), send(x, &[c])], Terminal, actual.clone()));
@@ -590,8 +620,8 @@ fn new_names_in_repeating_read() {
 #[test]
 fn new_names_in_repeating_send() {
     // w[x].w[y].y(b).x(c).() ![a]w(a).a[x].() !a(d).()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[x]), read(w, &[y]), send(y, &[b]), send(x, &[c])], Terminal, actual.clone()));
@@ -625,9 +655,9 @@ fn new_names_in_repeating_send() {
 fn new_names_in_prefix_do_not_affect_channel() {
     // [w]w[m].(+ [x]x[n].(| [y]y[o].() ) )
     // [w]w(a).(+ [x]x(b).(| [y]y(c).() ) )
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o) = (&n(0x6d), &n(0x6e), &n(0x6f));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(vec![read(w, &[m]).new_names(&[w])], choice(vec![
@@ -681,9 +711,9 @@ fn new_names_in_prefix_do_not_affect_channel() {
 fn new_names_before_parallel() {
     // w[x].[w, x](| w(c).() x[o].() y[p].x(p).x(p) )
     // w(a).w[m].() a[n].() x[o].() y(b).()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o, p) = (&n(0x6d), &n(0x6e), &n(0x6f), &n(0x70));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o, p) = (&n("m"), &n("n"), &n("o"), &n("p"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -728,9 +758,9 @@ fn new_names_before_parallel() {
 fn new_names_before_choice() {
     // w[x].[w, x](+ w(c).() x[o].() y[p].x(p) )
     // w(a).w[m].() a[n].() x[o].() y(b).()
-    let (w, x, y) = (&n(0x77), &n(0x78), &n(0x79));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
-    let (m, n, o, p) = (&n(0x6d), &n(0x6e), &n(0x6f), &n(0x70));
+    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let (m, n, o, p) = (&n("m"), &n("n"), &n("o"), &n("p"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -769,8 +799,8 @@ fn new_names_before_choice() {
 #[test]
 fn new_names_in_parallel_prefixes() {
     // w[x].(| [x]w(x).x(b).() [a]w[y].a(c).() x[z].() ) w(a).a[z].()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
-    let (a, b, c) = (&n(0x61), &n(0x62), &n(0x63));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -813,9 +843,9 @@ fn new_names_in_choice_prefixes() {
     // w[x].(+ [m]w[y].y(m).m(b).() )
     // w(a).(+ [n]w(n).n[o].o[p].() )
     // m[z].() n(c).() o(d).()
-    let (w, x, y, z) = (&n(0x77), &n(0x78), &n(0x79), &n(0x80));
-    let (a, b, c, d) = (&n(0x61), &n(0x62), &n(0x63), &n(0x64));
-    let (m, n, o, p) = (&n(0x6d), &n(0x6e), &n(0x6f), &n(0x70));
+    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
+    let (m, n, o, p) = (&n("m"), &n("n"), &n("o"), &n("p"));
     let mut pipl = Pipl::new();
     let actual = Rc::new(Results::new());
     pipl.add(make(
@@ -859,4 +889,26 @@ fn new_names_in_choice_prefixes() {
     expected.log(f(&send(m, &[b])), refs_wx.clone());
     pipl.step();
     assert_eq_results(actual.clone(), expected);
+}
+#[test]
+fn mixed_name_value_types() {
+    // w(x).x[y].() w[z].z(z).()
+    let (w, x, y, z) = (&n("w"), &n('x'), &n(121), &n(vec!["z"]));
+    let mut pipl = Pipl::new();
+    let actual = Rc::new(Results::new());
+    pipl.add(make(vec![send(w, &[x]), read(x, &[y])], Terminal, actual.clone()));
+    pipl.add(make(vec![read(w, &[z]), send(z, &[z])], Terminal, actual.clone()));
+    let expected = Rc::new(Results::new());
+    let refs_wx = &mut Refs::new();
+    let refs_wz = &mut Refs::new();
+    refs_wz.set(z.clone(), x.clone());
+    expected.log(f(&send(w, &[x])), refs_wx.clone());
+    expected.log(f(&read(w, &[z])), refs_wz.clone());
+    pipl.step();
+    assert_eq_results(actual.clone(), expected.clone());
+    refs_wx.set(y.clone(), x.clone());
+    expected.log(f(&read(x, &[y])), refs_wx.clone());
+    expected.log(f(&send(z, &[z])), refs_wz.clone());
+    pipl.step();
+    assert_eq_results(actual, expected);
 }

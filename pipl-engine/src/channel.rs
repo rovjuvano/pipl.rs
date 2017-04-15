@@ -37,29 +37,29 @@ mod tests {
     use super::Channel;
     use ::name::Name;
     use ::refs::Refs;
-    fn n(name: u8) -> Name {
-        Name::from(vec!(name))
+    fn n(name: char) -> Name {
+        Name::new(name)
     }
     #[test]
     fn read() {
-        let x = n(0);
+        let x = n('x');
         assert_eq!(Channel::read(x.clone()), Channel::Read(x));
     }
     #[test]
     fn send() {
-        let x = n(0);
+        let x = n('x');
         assert_eq!(Channel::send(x.clone()), Channel::Send(x));
     }
     #[test]
     fn invert() {
-        let (x, y) = (n(0), n(1));
+        let (x, y) = (n('x'), n('y'));
         assert_eq!(Channel::read(x.clone()).invert(), Channel::send(x));
         assert_eq!(Channel::send(y.clone()).invert(), Channel::read(y));
     }
     #[test]
     fn translate() {
-        let (x, y) = (n(0x78), n(0x79));
-        let (a, b) = (n(0x61), n(0x62));
+        let (x, y) = (n('x'), n('y'));
+        let (a, b) = (n('a'), n('b'));
         let read = Channel::read(x.clone());
         let send = Channel::send(y.clone());
         let refs = &mut Refs::new();
