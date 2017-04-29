@@ -1,5 +1,5 @@
 extern crate pipl_engine;
-use pipl_engine::{Call, Name, Pipl, Prefix, Process, Refs, Sequence};
+use pipl_engine::{Call, Name, Pipl, PiplBuilder, Refs};
 use std::env;
 use std::fmt;
 use std::rc::Rc;
@@ -24,27 +24,25 @@ impl Call for EchoCall {
         refs
     }
 }
-fn make_read(echo: Name) -> Sequence {
+fn make_read(builder: &mut PiplBuilder, echo: Name) {
     let arg = n(());
-    Sequence::new(
-        vec![],
-        Prefix::read_many(echo, vec![arg.clone()]),
-        Process::new_call(Rc::new(EchoCall::new(arg)), Process::Terminal)
-    )
+    builder.read(echo)
+        .names(&[arg.clone()])
+        .repeat()
+        .call(Rc::new(EchoCall::new(arg)));
 }
-fn make_send(echo: Name, arg: String) -> Sequence {
-    Sequence::new(
-        vec![],
-        Prefix::send(echo.clone(), vec![n(arg)]),
-        Process::Terminal
-    )
+fn make_send(builder: &mut PiplBuilder, echo: Name, arg: String) {
+    builder.send(echo)
+        .names(&[n(arg)]);
 }
 fn main() {
     let mut pipl = Pipl::new();
+    let mut builder = PiplBuilder::new();
     let echo = &n("echo");
-    pipl.add(make_read(echo.clone()));
+    make_read(&mut builder, echo.clone());
     for arg in env::args().skip(1) {
-        pipl.add(make_send(echo.clone(), arg));
+        make_send(&mut builder, echo.clone(), arg);
+        builder.apply(&mut pipl);
         pipl.step();
         pipl.step();
     }

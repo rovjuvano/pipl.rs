@@ -1,3 +1,6 @@
+mod builder;
+pub use self::builder::{ChoiceBuilder, ParallelBuilder, PiplBuilder, PrefixBuilder};
+
 mod call;
 pub use self::call::Call;
 
