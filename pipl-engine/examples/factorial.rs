@@ -6,42 +6,42 @@ use std::rc::Rc;
 fn n<T: fmt::Debug + 'static>(name: T) -> Name {
     Name::new(name)
 }
-fn add_factorial(builder: &mut PiplBuilder, greater_than: Name, subtract: Name, multiply: Name) -> Name {
+fn add_factorial(builder: &mut PiplBuilder, greater_than: &Name, subtract: &Name, multiply: &Name) -> Name {
     let fact = n("fact");
-    let x = n("x");
-    let out = n("out");
-    let gt2 = n("greater-than-two");
-    let le2 = n("two-or-less");
-    let (t1, t2, t3) = (n("t1"), n("t2"), n("t3"));
-    let x_minus_1 = n("x-1");
-    let factorial_x_minus_1 = n("!(x-1)");
-    let result = n("result");
+    let x = &n("x");
+    let out = &n("out");
+    let gt2 = &n("greater-than-two");
+    let le2 = &n("two-or-less");
+    let (t1, t2, t3) = (&n("t1"), &n("t2"), &n("t3"));
+    let x_minus_1 = &n("x-1");
+    let factorial_x_minus_1 = &n("!(x-1)");
+    let result = &n("result");
     let c = builder
-        .read(fact.clone())
-            .names(&[x.clone(), out.clone()])
+        .read(&fact)
+            .names(&[x, out])
             .repeat()
             .send(greater_than)
-                .restrict(&[gt2.clone(), le2.clone()])
-                .names(&[x.clone(), n(2usize), gt2.clone(), le2.clone()])
+                .restrict(&[gt2, le2])
+                .names(&[x, &n(2usize), gt2, le2])
                 .choice();
     c.read(le2)
-        .send(out.clone())
-            .names(&[x.clone()]);
+        .send(out)
+            .names(&[x]);
     let p = c.read(gt2)
         .parallel()
-            .restrict(&[t1.clone(), t2.clone(), t3.clone()]);
+            .restrict(&[t1, t2, t3]);
     p.send(subtract)
-        .names(&[x.clone(), n(1usize), t1.clone()]);
+        .names(&[x, &n(1usize), t1]);
     p.read(t1)
-        .names(&[x_minus_1.clone()])
-        .send(fact.clone())
-            .names(&[x_minus_1, t2.clone()]);
+        .names(&[x_minus_1])
+        .send(&fact)
+            .names(&[x_minus_1, t2]);
     p.read(t2)
-        .names(&[factorial_x_minus_1.clone()])
+        .names(&[factorial_x_minus_1])
         .send(multiply)
-            .names(&[x.clone(), factorial_x_minus_1.clone(), t3.clone()]);
+            .names(&[x, factorial_x_minus_1, t3]);
     p.read(t3)
-        .names(&[result.clone()])
+        .names(&[result])
         .send(out)
             .names(&[result]);
     fact
@@ -62,8 +62,8 @@ fn add_print(builder: &mut PiplBuilder) -> Name {
     }
     let name = n("print");
     let arg = n("arg");
-    builder.read(name.clone())
-        .names(&[arg.clone()])
+    builder.read(&name)
+        .names(&[&arg])
         .repeat()
         .call(Rc::new(PrintCall(arg)));
     name
@@ -89,15 +89,16 @@ fn add_greater_than(builder: &mut PiplBuilder) -> Name {
         }
     }
     let name = n(">");
-    let a = n("a");
-    let b = n("b");
-    let gt = n("gt");
-    let lte = n("lte");
-    let out = n("->");
-    builder.read(name.clone())
-        .names(&[a.clone(), b.clone(), gt.clone(), lte.clone()])
+    let a = &n("a");
+    let b = &n("b");
+    let gt = &n("gt");
+    let lte = &n("lte");
+    let out = &n("->");
+    let gt_call = GreaterThanCall { a: a.clone(), b: b.clone(), gt: gt.clone(), lte: lte.clone(), out: out.clone() };
+    builder.read(&name)
+        .names(&[a, b, gt, lte])
         .repeat()
-        .call(Rc::new(GreaterThanCall { a: a, b: b, gt: gt, lte: lte, out: out.clone() }))
+        .call(Rc::new(gt_call))
         .send(out);
     name
 }
@@ -132,17 +133,18 @@ fn add_binary_op<T>(builder: &mut PiplBuilder, label: &str, f: T) -> Name
     where T: Fn(usize, usize) -> usize + 'static
 {
     let name = n("-");
-    let a = n("a");
-    let b = n("b");
-    let result = n("=");
-    let out = n("->");
+    let a = &n("a");
+    let b = &n("b");
+    let result = &n("=");
+    let out = &n("->");
+    let op = BinaryOpCall { label: label.to_string(), f: Box::new(f), a: a.clone(), b: b.clone(), out: result.clone() };
     builder
-        .read(name.clone())
-            .names(&[a.clone(), b.clone(), out.clone()])
+        .read(&name)
+            .names(&[a, b, out])
             .repeat()
-            .call(Rc::new(BinaryOpCall { label: label.to_string(), f: Box::new(f), a: a, b: b, out: result.clone() }))
+            .call(Rc::new(op))
         .send(out)
-           .names(&[result]);
+           .names(&[&result]);
     name
 }
 fn add_subtract(builder: &mut PiplBuilder) -> Name {
@@ -154,15 +156,15 @@ fn add_multiply(builder: &mut PiplBuilder) -> Name {
 fn main() {
     let pipl = &mut Pipl::new();
     let mut builder = PiplBuilder::new();
-    let greater_than = add_greater_than(&mut builder);
-    let subtract = add_subtract(&mut builder);
-    let multiply = add_multiply(&mut builder);
-    let fact = add_factorial(&mut builder, greater_than, subtract, multiply);
-    let print = add_print(&mut builder);
+    let greater_than = &add_greater_than(&mut builder);
+    let subtract = &add_subtract(&mut builder);
+    let multiply = &add_multiply(&mut builder);
+    let fact = &add_factorial(&mut builder, greater_than, subtract, multiply);
+    let print = &add_print(&mut builder);
     builder.apply(pipl);
     for arg in env::args().skip(1) {
         let x = usize::from_str_radix(&arg, 10).unwrap();
-        builder.send(fact.clone()).names(&[n(x), print.clone()]);
+        builder.send(fact).names(&[&n(x), print]);
         builder.apply(pipl);
         for _ in 0..999 {
             pipl.step();

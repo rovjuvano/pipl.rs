@@ -20,17 +20,17 @@ impl PiplBuilder {
             sequences: Vec::new(),
         }
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: Name) -> &'a mut PrefixBuilder {
-        let b = PrefixBuilder::new(prefix_type, name);
+    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder {
+        let b = PrefixBuilder::new(prefix_type, name.clone());
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
-    pub fn read<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Read, name)
     }
     /// start building a new sequence with a send prefix
-    pub fn send<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
     /// add all sequences to Pipl and remove from builder
@@ -71,13 +71,13 @@ impl PrefixBuilder {
         self
     }
     /// add names to make unique within prefix
-    pub fn restrict<'a>(&'a mut self, names: &[Name]) -> &'a mut Self {
-        self.restricts.extend_from_slice(names);
+    pub fn restrict<'a>(&'a mut self, names: &[&Name]) -> &'a mut Self {
+        self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
     /// add names to communicate
-    pub fn names<'a>(&'a mut self, names: &[Name]) -> &'a mut Self {
-        self.names.extend_from_slice(names);
+    pub fn names<'a>(&'a mut self, names: &[&Name]) -> &'a mut Self {
+        self.names.extend(names.iter().map(|&x| x.clone()));
         self
     }
     /// set callback to call between communication and next process
@@ -85,9 +85,9 @@ impl PrefixBuilder {
         self.call = Some(call);
         self
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: Name) -> &'a mut PrefixBuilder {
+    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder {
         use std::borrow::BorrowMut;
-        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(prefix_type, name)));
+        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(prefix_type, name.clone())));
         if let &mut Builder::Prefix(ref mut b) = self.next.borrow_mut() {
             b
         }
@@ -96,11 +96,11 @@ impl PrefixBuilder {
         }
     }
     /// terminate prefix with a read prefix
-    pub fn read<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Read, name)
     }
     /// terminate prefix with a send prefix
-    pub fn send<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
     /// terminate prefix with a parallel process
@@ -171,21 +171,21 @@ impl ParallelBuilder {
         }
     }
     /// add names to make unique within process
-    pub fn restrict<'a>(&'a mut self, names: &[Name]) -> &'a mut Self {
-        self.restricts.extend_from_slice(names);
+    pub fn restrict<'a>(&'a mut self, names: &[&Name]) -> &'a mut Self {
+        self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: Name) -> &'a mut PrefixBuilder {
-        let b = PrefixBuilder::new(prefix_type, name);
+    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder {
+        let b = PrefixBuilder::new(prefix_type, name.clone());
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
-    pub fn read<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Read, name)
     }
     /// start building a new sequence with a send prefix
-    pub fn send<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
     fn build(self) -> (Vec<Name>, Process) {
@@ -206,21 +206,21 @@ impl ChoiceBuilder {
         }
     }
     /// add names to make unique within process
-    pub fn restrict<'a>(&'a mut self, names: &[Name]) -> &'a mut Self {
-        self.restricts.extend_from_slice(names);
+    pub fn restrict<'a>(&'a mut self, names: &[&Name]) -> &'a mut Self {
+        self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: Name) -> &'a mut PrefixBuilder {
-        let b = PrefixBuilder::new(prefix_type, name);
+    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder {
+        let b = PrefixBuilder::new(prefix_type, name.clone());
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
-    pub fn read<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Read, name)
     }
     /// start building a new sequence with a send prefix
-    pub fn send<'a>(&'a mut self, name: Name) -> &'a mut PrefixBuilder {
+    pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
     fn build(self) -> (Vec<Name>, Process) {

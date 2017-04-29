@@ -24,24 +24,24 @@ impl Call for EchoCall {
         refs
     }
 }
-fn make_read(builder: &mut PiplBuilder, echo: Name) {
+fn make_read(builder: &mut PiplBuilder, echo: &Name) {
     let arg = n(());
     builder.read(echo)
-        .names(&[arg.clone()])
+        .names(&[&arg])
         .repeat()
         .call(Rc::new(EchoCall::new(arg)));
 }
-fn make_send(builder: &mut PiplBuilder, echo: Name, arg: String) {
+fn make_send(builder: &mut PiplBuilder, echo: &Name, arg: String) {
     builder.send(echo)
-        .names(&[n(arg)]);
+        .names(&[&n(arg)]);
 }
 fn main() {
     let mut pipl = Pipl::new();
     let mut builder = PiplBuilder::new();
     let echo = &n("echo");
-    make_read(&mut builder, echo.clone());
+    make_read(&mut builder, echo);
     for arg in env::args().skip(1) {
-        make_send(&mut builder, echo.clone(), arg);
+        make_send(&mut builder, echo, arg);
         builder.apply(&mut pipl);
         pipl.step();
         pipl.step();
