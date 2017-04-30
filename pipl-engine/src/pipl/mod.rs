@@ -27,8 +27,8 @@ impl Pipl {
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
             let mut mods = Mods::new();
-            let output = sender.output(&mut mods);
-            reader.input(&mut mods, output);
+            let output = sender.send(&mut mods);
+            reader.read(&mut mods, output);
             mods.apply(self);
         }
     }
