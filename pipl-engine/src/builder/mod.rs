@@ -1,9 +1,9 @@
 use ::call::Call;
+use ::channel::Channel;
 use ::name::Name;
 use ::pipl::Pipl;
 use ::prefix::Prefix;
-use ::process::Process;
-use ::process::sequence::Sequence;
+use ::prefix::Action;
 use std::rc::Rc;
 pub enum Builder {
     Prefix(PrefixBuilder),
@@ -125,13 +125,7 @@ impl PrefixBuilder {
             unreachable!()
         }
     }
-    fn prepend_new_names((restricts, p): (Vec<Name>, Process)) -> Process {
-        if restricts.len() > 0 {
-            return Process::new_names(restricts, p)
-        }
-        p
-    }
-    fn build(self) -> Sequence {
+    fn build(self) -> Prefix {
         let PrefixBuilder {
             prefix_type,
             name,
@@ -141,22 +135,42 @@ impl PrefixBuilder {
             call,
             next,
         } = self;
-        let prefix = match (prefix_type, repeating) {
-            (PrefixType::Read, false) => Prefix::read(name, names),
-            (PrefixType::Send, false) => Prefix::send(name, names),
-            (PrefixType::Read, true) => Prefix::read_many(name, names),
-            (PrefixType::Send, true) => Prefix::send_many(name, names),
+        let channel = match prefix_type {
+            PrefixType::Read => Channel::read(name),
+            PrefixType::Send => Channel::send(name),
         };
-        let mut suffix = match *next {
-            Builder::Choice(b)   => Self::prepend_new_names(b.build()),
-            Builder::Parallel(b) => Self::prepend_new_names(b.build()),
-            Builder::Prefix(b)   => Process::Sequence(Rc::new(b.build())),
-            Builder::Terminal    => Process::Terminal,
-        };
-        if let Some(call) = call {
-            suffix = Process::new_call(call, suffix)
+        let mut actions = Vec::new();
+        if repeating {
+            actions.push(Action::Repeat);
         }
-        Sequence::new(restricts, prefix, suffix)
+        if restricts.len() > 0 {
+            actions.push(Action::Restrict(restricts));
+        }
+        if names.len() > 0 {
+            actions.push(Action::Communicate(names));
+        }
+        if let Some(call) = call {
+            actions.push(Action::Call(call));
+        }
+        match *next {
+            Builder::Choice(b) => {
+                let (restricts, sequences) = b.build();
+                if restricts.len() > 0 {
+                    actions.push(Action::Restrict(restricts));
+                }
+                actions.push(Action::Choice(sequences));
+            },
+            Builder::Parallel(b) => {
+                let (restricts, sequences) = b.build();
+                if restricts.len() > 0 {
+                    actions.push(Action::Restrict(restricts));
+                }
+                actions.push(Action::Parallel(sequences));
+            },
+            Builder::Prefix(b) => actions.push(Action::Prefix(Rc::new(b.build()))),
+            Builder::Terminal => {},
+        };
+        Prefix::new(channel, actions)
     }
 }
 pub struct ParallelBuilder {
@@ -188,9 +202,9 @@ impl ParallelBuilder {
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
-    fn build(self) -> (Vec<Name>, Process) {
+    fn build(self) -> (Vec<Name>, Vec<Rc<Prefix>>) {
         let ParallelBuilder { restricts, sequences } = self;
-        let p = Process::new_parallel(sequences.into_iter().map(|x| Rc::new(x.build())).collect());
+        let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
         (restricts, p)
     }
 }
@@ -223,9 +237,9 @@ impl ChoiceBuilder {
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(PrefixType::Send, name)
     }
-    fn build(self) -> (Vec<Name>, Process) {
+    fn build(self) -> (Vec<Name>, Vec<Rc<Prefix>>) {
         let ChoiceBuilder { restricts, sequences } = self;
-        let p = Process::new_choice(sequences.into_iter().map(|x| Rc::new(x.build())).collect());
+        let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
         (restricts, p)
     }
 }

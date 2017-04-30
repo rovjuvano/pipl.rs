@@ -3,7 +3,7 @@ use self::mods::Mods;
 
 use ::channel::Channel;
 use ::name::Name;
-use ::process::sequence::Sequence;
+use ::prefix::Prefix;
 use ::reaction::Reaction;
 use ::reaction::sequence::SequenceReaction;
 use ::refs::Refs;
@@ -19,9 +19,9 @@ impl Pipl {
             map: ReactionMap::new(),
         }
     }
-    pub fn add(&mut self, sequence: Sequence) {
-        let channel = sequence.channel().clone();
-        let reaction = Reaction::new_sequence(Refs::new(), Rc::new(sequence));
+    pub fn add(&mut self, prefix: Prefix) {
+        let channel = prefix.channel().clone();
+        let reaction = Reaction::new_sequence(Refs::new(), Rc::new(prefix));
         self.add_reaction(&channel, Rc::new(reaction));
     }
     pub fn step(&mut self) {

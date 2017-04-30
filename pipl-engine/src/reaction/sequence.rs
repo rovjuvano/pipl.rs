@@ -1,41 +1,51 @@
 use ::channel::Channel;
 use ::name::Name;
 use ::pipl::mods::Mods;
-use ::process::sequence::Sequence;
+use ::prefix::Action;
+use ::prefix::Prefix;
 use ::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct SequenceReaction {
     refs: Refs,
-    sequence: Rc<Sequence>,
+    prefix: Rc<Prefix>,
 }
 impl SequenceReaction {
-    pub fn new(refs: Refs, sequence: Rc<Sequence>) -> Self {
-        SequenceReaction { refs: refs, sequence: sequence }
+    pub fn new(refs: Refs, prefix: Rc<Prefix>) -> Self {
+        SequenceReaction { refs: refs, prefix: prefix }
     }
     pub fn channels(&self) -> Vec<&Channel> {
-        vec![self.sequence.channel()]
+        vec![self.prefix.channel()]
     }
-    pub fn input(self, mods: &mut Mods, names: Vec<Name>) {
-        let SequenceReaction { mut refs, sequence } = self;
-        refs.new_names(sequence.new_names().clone());
-        if sequence.suffix().is_nonterminal() {
-            refs.set_names(sequence.names().clone(), names);
+    pub fn input(self, mods: &mut Mods, input_names: Vec<Name>) {
+        let SequenceReaction { mut refs, prefix } = self;
+        for action in prefix.actions() {
+            match action {
+                &Action::Repeat => mods.add_sequence(refs.clone(), prefix.clone()),
+                &Action::Restrict(ref names) => refs.new_names(names.clone()),
+                &Action::Communicate(ref names) => refs.set_names(names.clone(), input_names.clone()),
+                &Action::Call(ref call) => refs = call.call(refs),
+                &Action::Prefix(ref prefix) => mods.add_sequence(refs.clone(), prefix.clone()),
+                &Action::Parallel(ref sequences) => mods.add_parallel(refs.clone(), sequences.clone()),
+                &Action::Choice(ref sequences) => mods.add_choice(refs.clone(), sequences.clone()),
+            }
         }
-        Self::react(mods, refs, sequence);
     }
     pub fn output(self, mods: &mut Mods) -> Vec<Name> {
-        let SequenceReaction { mut refs, sequence } = self;
-        refs.new_names(sequence.new_names().clone());
-        let names = refs.get_names(sequence.names());
-        Self::react(mods, refs, sequence);
-        names
-    }
-    fn react(mods: &mut Mods, refs: Refs, sequence: Rc<Sequence>) {
-        if sequence.is_repeating() {
-            mods.add_sequence(refs.clone(), sequence.clone())
+        let SequenceReaction { mut refs, prefix } = self;
+        let mut output_names = Vec::new();
+        for action in prefix.actions() {
+            match action {
+                &Action::Repeat => mods.add_sequence(refs.clone(), prefix.clone()),
+                &Action::Restrict(ref names) => refs.new_names(names.clone()),
+                &Action::Communicate(ref names) => output_names = refs.get_names(&names.clone()),
+                &Action::Call(ref call) => refs = call.call(refs),
+                &Action::Prefix(ref prefix) => mods.add_sequence(refs.clone(), prefix.clone()),
+                &Action::Parallel(ref sequences) => mods.add_parallel(refs.clone(), sequences.clone()),
+                &Action::Choice(ref sequences) => mods.add_choice(refs.clone(), sequences.clone()),
+            }
         }
-        mods.produce(refs, sequence.suffix());
+        output_names
     }
     #[inline]
     pub fn refs(&self) -> &Refs {

@@ -5,8 +5,7 @@ pub mod sequence;
 use self::sequence::SequenceReaction;
 
 use ::channel::Channel;
-use ::process::choice::ChoiceProcess;
-use ::process::sequence::Sequence;
+use ::prefix::Prefix;
 use ::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
@@ -15,10 +14,10 @@ pub enum Reaction {
     Sequence(SequenceReaction),
 }
 impl Reaction {
-    pub fn new_choice(refs: Refs, choice: Rc<ChoiceProcess>) -> Self {
-        Reaction::Choice(ChoiceReaction::new(refs, choice))
+    pub fn new_choice(refs: Refs, sequences: Vec<Rc<Prefix>>) -> Self {
+        Reaction::Choice(ChoiceReaction::new(refs, sequences))
     }
-    pub fn new_sequence(refs: Refs, sequence: Rc<Sequence>) -> Self {
+    pub fn new_sequence(refs: Refs, sequence: Rc<Prefix>) -> Self {
         Reaction::Sequence(SequenceReaction::new(refs, sequence))
     }
     pub fn channels(&self) -> Vec<&Channel> {
