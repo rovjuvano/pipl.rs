@@ -4,32 +4,37 @@ fn terminate_parallel() {
     // w[x].(| x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
     let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
     let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
+    let actual = &Rc::new(Results::new());
+    let mut builder = PiplBuilder::new();
+    {
+        let parallel = builder.read(w).names(&[x]).call(log("w[x]", actual)).parallel();
+        parallel
+            .read(x).names(&[y]).call(log("x[y]", actual));
+        parallel
+            .read(y).names(&[z]).call(log("y[z]", actual))
+            .read(y).names(&[z]).call(log("y[z]", actual));
+    }
+    builder
+        .send(w).names(&[a]).call(log("w(a)", actual))
+        .send(a).names(&[b]).call(log("a(b)", actual))
+        .send(y).names(&[c]).call(log("y(c)", actual));
+    builder.send(b).names(&[d]).call(log("b(d)", actual));
     let mut pipl = Pipl::new();
-    let actual = Rc::new(Results::new());
-    pipl.add(make(
-        vec![read(w, &[x])],
-        parallel(vec![
-            make(vec![read(x, &[y])], Terminal, actual.clone()),
-            make(vec![read(y, &[z]), read(y, &[z])], Terminal, actual.clone()),
-        ]),
-        actual.clone()
-    ));
-    pipl.add(make(vec![send(w, &[a]), send(a, &[b]), send(y, &[c])], Terminal, actual.clone()));
-    pipl.add(make(vec![send(b, &[d])], Terminal, actual.clone()));
-    let expected = Rc::new(Results::new());
+    builder.apply(&mut pipl);
+    let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
     let refs_wx = &mut Refs::new();
     refs_wx.set(x.clone(), a.clone());
-    expected.log(f(&read(w, &[x])), refs_wx.clone());
+    expected.log("w[x]", refs_wx.clone());
     let refs_wxxy = &mut refs_wx.clone();
     let refs_wxyz = &mut refs_wx.clone();
     refs_wxxy.set(y.clone(), b.clone());
     refs_wxyz.set(z.clone(), c.clone());
-    expected.log(f(&read(x, &[y])), refs_wxxy.clone());
-    expected.log(f(&read(y, &[z])), refs_wxyz.clone());
-    expected.log(f(&send(w, &[a])), refs_empty.clone());
-    expected.log(f(&send(a, &[b])), refs_empty.clone());
-    expected.log(f(&send(y, &[c])), refs_empty.clone());
+    expected.log("x[y]", refs_wxxy.clone());
+    expected.log("y[z]", refs_wxyz.clone());
+    expected.log("w(a)", refs_empty.clone());
+    expected.log("a(b)", refs_empty.clone());
+    expected.log("y(c)", refs_empty.clone());
     pipl.step();
     pipl.step();
     pipl.step();

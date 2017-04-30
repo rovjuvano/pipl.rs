@@ -13,7 +13,6 @@ mod name;
 pub use self::name::Name;
 
 mod prefix;
-pub use self::prefix::Prefix;
 
 mod process;
 pub use self::process::call_process::CallProcess;

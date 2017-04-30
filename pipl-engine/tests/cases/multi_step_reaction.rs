@@ -4,19 +4,25 @@ fn multi_step_reaction() {
     // w[x].w[y] w(a).w(b)
     let (w, x, y) = (&n("w"), &n("x"), &n("y"));
     let (a, b) = (&n("a"), &n("b"));
+    let actual = &Rc::new(Results::new());
+    let mut builder = PiplBuilder::new();
+    builder
+        .read(w).names(&[x]).call(log("w[x]", actual))
+        .read(w).names(&[y]).call(log("w[y]", actual));
+    builder
+        .send(w).names(&[a]).call(log("w(a)", actual))
+        .send(w).names(&[b]).call(log("w(b)", actual));
     let mut pipl = Pipl::new();
-    let actual = Rc::new(Results::new());
-    pipl.add(make(vec![read(w, &[x]), read(w, &[y])], Terminal, actual.clone()));
-    pipl.add(make(vec![send(w, &[a]), send(w, &[b])], Terminal, actual.clone()));
-    pipl.step();
-    pipl.step();
-    let expected = Rc::new(Results::new());
+    builder.apply(&mut pipl);
+    let expected = &Rc::new(Results::new());
     let refs = &mut Refs::new();
-    expected.log(f(&send(w, &[a])), refs.clone());
-    expected.log(f(&send(w, &[b])), refs.clone());
+    expected.log("w(a)", refs.clone());
+    expected.log("w(b)", refs.clone());
     refs.set(x.clone(), a.clone());
-    expected.log(f(&read(w, &[x])), refs.clone());
+    expected.log("w[x]", refs.clone());
     refs.set(y.clone(), b.clone());
-    expected.log(f(&read(w, &[y])), refs.clone());
+    expected.log("w[y]", refs.clone());
+    pipl.step();
+    pipl.step();
     assert_eq_results(actual, expected);
 }
