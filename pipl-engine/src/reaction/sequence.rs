@@ -27,20 +27,40 @@ impl SequenceReaction {
     }
     fn react(mods: &mut Mods, mut refs: Refs, prefix: Rc<Prefix>, read_names: Option<Vec<Name>>) -> Option<Vec<Name>> {
         let mut send_names = None;
-        for action in prefix.actions() {
-            match action {
-                &Action::Repeat => mods.add_sequence(refs.clone(), prefix.clone()),
-                &Action::Restrict(ref names) => refs.new_names(names.clone()),
-                &Action::Communicate(ref names) => {
-                    match prefix.channel() {
-                        &Channel::Read(_) => refs.set_names(names.clone(), read_names.clone().unwrap()),
-                        &Channel::Send(_) => send_names = Some(refs.get_names(&names)),
-                    }
-                },
-                &Action::Call(ref call) => refs = call.call(refs),
-                &Action::Prefix(ref prefix) => mods.add_sequence(refs.clone(), prefix.clone()),
-                &Action::Parallel(ref sequences) => mods.add_parallel(refs.clone(), sequences.clone()),
-                &Action::Choice(ref sequences) => mods.add_choice(refs.clone(), sequences.clone()),
+        let mut iter = prefix.actions().iter();
+        let mut action = iter.next();
+        if let Some(&Action::Repeat) = action {
+            mods.add_sequence(refs.clone(), prefix.clone());
+            action = iter.next();
+        }
+        if let Some(&Action::Restrict(ref names)) = action {
+            refs.new_names(names.clone());
+            action = iter.next();
+        }
+        if let Some(&Action::Communicate(ref names)) = action {
+            match prefix.channel() {
+                &Channel::Read(_) => refs.set_names(names.clone(), read_names.unwrap()),
+                &Channel::Send(_) => send_names = Some(refs.get_names(&names)),
+            }
+            action = iter.next();
+        }
+        if let Some(&Action::Call(ref call)) = action {
+            refs = call.call(refs);
+            action = iter.next();
+        }
+        if let Some(&Action::Prefix(ref prefix)) = action {
+            mods.add_sequence(refs, prefix.clone());
+        }
+        else {
+            if let Some(&Action::Restrict(ref names)) = action {
+                refs.new_names(names.clone());
+                action = iter.next();
+            }
+            if let Some(&Action::Parallel(ref sequences)) = action {
+                mods.add_parallel(refs, sequences.clone());
+            }
+            else if let Some(&Action::Choice(ref sequences)) = action {
+                mods.add_choice(refs, sequences.clone());
             }
         }
         send_names
