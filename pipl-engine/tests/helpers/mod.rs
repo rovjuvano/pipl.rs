@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-pub use pipl_engine::{Name, Pipl};
+pub use pipl_engine::{Name, OnRead, OnSend, Pipl};
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;
@@ -9,8 +9,8 @@ pub use std::rc::Rc;
 #[derive(Debug, Eq, PartialEq)]
 pub struct Results(RefCell<HashMap<String, Vec<String>>>);
 impl Results {
-    pub fn new() -> Self {
-        Results(RefCell::new(HashMap::new()))
+    pub fn new() -> Rc<Self> {
+        Rc::new(Results(RefCell::new(HashMap::new())))
     }
     pub fn log<K: Into<String>, T: fmt::Debug>(&self, key: K, value: &T) {
         self.0.borrow_mut()
