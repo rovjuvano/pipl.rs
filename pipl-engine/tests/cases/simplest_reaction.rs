@@ -3,7 +3,7 @@ struct Read {
     results: Rc<Results>,
 }
 impl OnRead for Read {
-    fn read(&mut self, names: &Vec<Name>) {
+    fn read(&mut self, _pipl: &mut Pipl, names: &Vec<Name>) {
         self.results.log("read", names);
     }
 }
@@ -11,7 +11,7 @@ struct Send {
     names: Vec<Name>,
 }
 impl OnSend for Send {
-    fn send(&mut self) -> &Vec<Name> {
+    fn send(&mut self, _pipl: &mut Pipl) -> &Vec<Name> {
         &self.names
     }
 }

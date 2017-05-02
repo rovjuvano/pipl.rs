@@ -21,8 +21,8 @@ impl<'a> Pipl<'a> {
         if self.read.is_some() && self.send.is_some() {
             let mut read = self.read.take().unwrap();
             let mut send = self.send.take().unwrap();
-            let names = send.send();
-            read.read(names);
+            let names = send.send(self);
+            read.read(self, names);
         }
     }
 }
