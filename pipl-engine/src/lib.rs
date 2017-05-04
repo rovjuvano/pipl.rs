@@ -7,6 +7,10 @@ pub use name::Name;
 
 mod pipl;
 pub use pipl::Pipl;
+pub use pipl::mods::Mods;
+
+mod refs;
+pub use refs::Refs;
 
 // issue #36497: std::ptr::eq unstable
 #[inline]

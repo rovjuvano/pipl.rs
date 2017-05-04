@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-pub use pipl_engine::{Name, OnRead, OnSend, Pipl};
+pub use pipl_engine::{Mods, Name, OnRead, OnSend, Pipl, Refs};
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;

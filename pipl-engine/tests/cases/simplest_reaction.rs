@@ -1,18 +1,20 @@
 use helpers::*;
+#[derive(Debug)]
 struct Read {
     results: Rc<Results>,
 }
 impl OnRead for Read {
-    fn read(&mut self, _pipl: &mut Pipl, names: &Vec<Name>) {
-        self.results.log("read", names);
+    fn read(&self, _mods: &mut Mods, _refs: Refs, names: Vec<Name>) {
+        self.results.log("read", &names);
     }
 }
+#[derive(Debug)]
 struct Send {
     names: Vec<Name>,
 }
 impl OnSend for Send {
-    fn send(&mut self, _pipl: &mut Pipl) -> &Vec<Name> {
-        &self.names
+    fn send(&self, _mods: &mut Mods, _refs: Refs) -> Vec<Name> {
+        self.names.clone()
     }
 }
 #[test]
@@ -23,8 +25,8 @@ fn simplest_reaction() {
     let read = Read { results: actual.clone() };
     let send = Send { names: vec![a.clone()] };
     let mut pipl = Pipl::new();
-    pipl.read(w, read);
-    pipl.send(w, send);
+    pipl.read(w, Rc::new(read));
+    pipl.send(w, Rc::new(send));
     pipl.step();
     let expected = Results::new();
     expected.log("read", &vec![a.clone()]);
