@@ -24,7 +24,7 @@ impl Read {
 impl OnRead for Read {
     fn read(&self, mods: &mut Mods, mut refs: Refs, names: Vec<Name>) {
         refs.set_names(self.names.clone(), names.clone());
-        self.results.log("read", &refs);
+        self.results.log("read", Name::new(refs.clone()));
         if let Some((ref channel, ref read)) = self.next {
             mods.send(channel, refs, read.clone());
         }
@@ -74,8 +74,8 @@ fn simplest_mobility() {
     let refs_wz = &mut Refs::new();
     let refs_wx = &mut Refs::new();
     refs_wz.set(z.clone(), x.clone());
-    expected.log("read", refs_wz);
+    expected.log("read", Name::new(refs_wz.clone()));
     refs_wx.set(y.clone(), x.clone());
-    expected.log("read", refs_wx);
+    expected.log("read", Name::new(refs_wx.clone()));
     assert_eq_results(actual, expected);
 }
