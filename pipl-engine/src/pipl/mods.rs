@@ -7,15 +7,18 @@ use std::rc::Rc;
 pub struct Mods {
     read: Rc<OnRead>,
     send: Rc<OnSend>,
-    reads: Vec<ReadMod>,
-    sends: Vec<SendMod>,
+    mods: Vec<Mod>,
 }
-struct ReadMod {
+enum Mod {
+    Read(Read),
+    Send(Send),
+}
+struct Read {
     name: Name,
     refs: Refs,
     read: Rc<OnRead>,
 }
-struct SendMod {
+struct Send {
     name: Name,
     refs: Refs,
     send: Rc<OnSend>,
@@ -25,15 +28,14 @@ impl Mods {
         Mods {
             read: read,
             send: send,
-            reads: Vec::new(),
-            sends: Vec::new(),
+            mods: Vec::new(),
         }
     }
     pub fn read(&mut self, name: &Name, refs: Refs, read: Rc<OnRead>) {
-        self.reads.push(ReadMod{ name: name.clone(), read, refs });
+        self.mods.push(Mod::Read(Read{ name: name.clone(), read, refs }));
     }
     pub fn send(&mut self, name: &Name, refs: Refs, send: Rc<OnSend>) {
-        self.sends.push(SendMod { name: name.clone(), send, refs });
+        self.mods.push(Mod::Send(Send { name: name.clone(), send, refs }));
     }
     pub fn repeat_read(&mut self, name: &Name, refs: Refs) {
         let read = self.read.clone();
@@ -44,11 +46,11 @@ impl Mods {
         self.send(name, refs, send);
     }
     pub fn apply(self, pipl: &mut Pipl) {
-        for ReadMod { name, read, refs } in self.reads.into_iter() {
-            pipl.add_read(refs.get(&name).clone(), read, refs);
-        }
-        for SendMod { name, send, refs } in self.sends.into_iter() {
-            pipl.add_send(refs.get(&name).clone(), send, refs);
+        for x in self.mods.into_iter() {
+            match x {
+                Mod::Read(Read { name, read, refs }) => pipl.add_read(refs.get(&name).clone(), read, refs),
+                Mod::Send(Send { name, send, refs }) => pipl.add_send(refs.get(&name).clone(), send, refs),
+            }
         }
     }
 }

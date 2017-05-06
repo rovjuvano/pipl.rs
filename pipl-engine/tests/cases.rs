@@ -6,4 +6,5 @@ mod cases {
     mod simplest_mobility;
     mod repeating_read_prefix;
     mod repeating_send_prefix;
+    mod terminate_parallel;
 }

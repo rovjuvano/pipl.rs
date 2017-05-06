@@ -7,6 +7,7 @@ use ::Mods;
 use ::Refs;
 use std::collections::HashMap;
 use std::rc::Rc;
+#[derive(Debug)]
 pub struct Pipl {
     map: ReactionMap
 }
@@ -39,14 +40,17 @@ impl Pipl {
         }
     }
 }
+#[derive(Debug)]
 struct ReadReaction {
     read: Rc<OnRead>,
     refs: Refs,
 }
+#[derive(Debug)]
 struct SendReaction {
     send: Rc<OnSend>,
     refs: Refs,
 }
+#[derive(Debug)]
 struct ReactionMap {
     map: HashMap<Name, ReactionQueue>,
     queue: Vec<Name>,
@@ -86,6 +90,7 @@ impl ReactionMap {
         }
     }
 }
+#[derive(Debug)]
 struct ReactionQueue {
     reads: Vec<ReadReaction>,
     sends: Vec<SendReaction>,
