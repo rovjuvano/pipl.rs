@@ -3,57 +3,57 @@ use helpers::*;
 struct Read {
     results: Rc<Results>,
     names: Vec<Name>,
-    next: Option<(Name, Rc<Send>)>,
+    next: Option<Molecule>,
 }
 impl Read {
     fn new(results: &Rc<Results>, names: &[&Name]) -> Rc<Self> {
         Rc::new(Read {
             results: results.clone(),
-            names: names.iter().map(|&x| x.clone()).collect(),
+            names: unslice(names),
             next: None,
         })
     }
-    fn new_then(results: &Rc<Results>, names: &[&Name], channel: &Name, send: Rc<Send>) -> Rc<Self> {
+    fn new_then(results: &Rc<Results>, names: &[&Name], next: Molecule) -> Rc<Self> {
         Rc::new(Read {
             results: results.clone(),
             names: names.iter().map(|&x| x.clone()).collect(),
-            next: Some((channel.clone(), send)),
+            next: Some(next),
         })
     }
 }
 impl OnRead for Read {
-    fn read(&self, mods: &mut Mods, mut refs: Refs, names: Vec<Name>) {
+    fn read(&self, mods: &mut Mods, _read: ReadMolecule, mut refs: Refs, names: Vec<Name>) {
         refs.set_names(self.names.clone(), names.clone());
         self.results.log("read", Name::new(refs.clone()));
-        if let Some((ref channel, ref read)) = self.next {
-            mods.send(channel, refs, read.clone());
+        if let Some(ref next) = self.next {
+            mods.add(next.clone(), refs);
         }
     }
 }
 #[derive(Debug)]
 struct Send {
     names: Vec<Name>,
-    next: Option<(Name, Rc<Read>)>,
+    next: Option<Molecule>,
 }
 impl Send {
-    fn new(names: Vec<Name>) -> Rc<Self> {
+    fn new(names: &[&Name]) -> Rc<Self> {
         Rc::new(Send {
-            names: names,
+            names: unslice(names),
             next: None,
         })
     }
-    fn new_then(names: Vec<Name>, channel: &Name, read: Rc<Read>) -> Rc<Self> {
+    fn new_then(names: &[&Name], next: Molecule) -> Rc<Self> {
         Rc::new(Send {
-            names: names,
-            next: Some((channel.clone(), read)),
+            names: unslice(names),
+            next: Some(next),
         })
     }
 }
 impl OnSend for Send {
-    fn send(&self, mods: &mut Mods, refs: Refs) -> Vec<Name> {
+    fn send(&self, mods: &mut Mods, _send: SendMolecule, refs: Refs) -> Vec<Name> {
         let names = refs.get_names(&self.names);
-        if let Some((ref channel, ref send)) = self.next {
-            mods.read(channel, refs, send.clone());
+        if let Some(ref next) = self.next {
+            mods.add(next.clone(), refs);
         }
         names
     }
@@ -63,11 +63,11 @@ fn simplest_mobility() {
     // w[z].z(z).() w(x).x[y].()
     let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
     let actual = &Results::new();
-    let read = Read::new_then(actual, &[z], z, Send::new(vec![z.clone()]));
-    let send = Send::new_then(vec![x.clone()], x, Read::new(actual, &[y]));
+    let wz = read(w, Read::new_then(actual, &[z], send(z, Send::new(&[z]))));
+    let wx = send(w, Send::new_then(&[x], read(x, Read::new(actual, &[y]))));
     let mut pipl = Pipl::new();
-    pipl.read(w, read);
-    pipl.send(w, send);
+    pipl.add(wz);
+    pipl.add(wx);
     pipl.step();
     pipl.step();
     let expected = &Results::new();

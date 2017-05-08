@@ -4,7 +4,7 @@ struct Read {
     results: Rc<Results>,
 }
 impl OnRead for Read {
-    fn read(&self, _mods: &mut Mods, _refs: Refs, names: Vec<Name>) {
+    fn read(&self, _mods: &mut Mods, _read: ReadMolecule, _refs: Refs, names: Vec<Name>) {
         self.results.log("read", Name::new(names));
     }
 }
@@ -13,7 +13,7 @@ struct Send {
     names: Vec<Name>,
 }
 impl OnSend for Send {
-    fn send(&self, _mods: &mut Mods, _refs: Refs) -> Vec<Name> {
+    fn send(&self, _mods: &mut Mods, _send: SendMolecule, _refs: Refs) -> Vec<Name> {
         self.names.clone()
     }
 }
@@ -22,11 +22,11 @@ fn simplest_reaction() {
     // w[x] w(a)
     let (w, a) = (&n("w"), &n("a"));
     let actual = &Results::new();
-    let read = Read { results: actual.clone() };
-    let send = Send { names: vec![a.clone()] };
+    let wx = read(w, Rc::new(Read { results: actual.clone() }));
+    let wa = send(w, Rc::new(Send { names: vec![a.clone()] }));
     let mut pipl = Pipl::new();
-    pipl.read(w, Rc::new(read));
-    pipl.send(w, Rc::new(send));
+    pipl.add(wx);
+    pipl.add(wa);
     pipl.step();
     let expected = &Results::new();
     expected.log("read", Name::new(vec![a.clone()]));

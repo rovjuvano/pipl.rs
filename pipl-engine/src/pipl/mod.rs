@@ -1,12 +1,12 @@
 pub mod mods;
 
 use ::Name;
-use ::OnRead;
-use ::OnSend;
 use ::Mods;
+use ::Molecule;
+use ::ReadMolecule;
 use ::Refs;
+use ::SendMolecule;
 use std::collections::HashMap;
-use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl {
     map: ReactionMap
@@ -17,23 +17,32 @@ impl Pipl {
             map: ReactionMap::new(),
         }
     }
-    pub fn read(&mut self, name: &Name, read: Rc<OnRead>) {
-        self.add_read(name.clone(), read, Refs::new());
+    pub fn add(&mut self, molecule: Molecule) {
+        self.add_molecule(molecule, Refs::new());
     }
-    pub fn send(&mut self, name: &Name, send: Rc<OnSend>) {
-        self.add_send(name.clone(), send, Refs::new());
+    pub fn read(&mut self, read: ReadMolecule) {
+        self.add_read(read, Refs::new());
     }
-    fn add_read(&mut self, name: Name, read: Rc<OnRead>, refs: Refs) {
-        self.map.add_read(name, ReadReaction { read, refs });
+    pub fn send(&mut self, send: SendMolecule) {
+        self.add_send(send, Refs::new());
     }
-    fn add_send(&mut self, name: Name, send: Rc<OnSend>, refs: Refs) {
-        self.map.add_send(name, SendReaction { send, refs });
+    fn add_molecule(&mut self, molecule: Molecule, refs: Refs) {
+        match molecule {
+            Molecule::Read(read) => self.add_read(read, refs),
+            Molecule::Send(send) => self.add_send(send, refs),
+        }
+    }
+    fn add_read(&mut self, read: ReadMolecule, refs: Refs) {
+        self.map.add_read(ReadReaction::new(read, refs));
+    }
+    fn add_send(&mut self, send: SendMolecule, refs: Refs) {
+        self.map.add_send(SendReaction::new(send, refs));
     }
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
             let ReadReaction { read, refs: read_refs } = reader;
             let SendReaction { send, refs: send_refs } = sender;
-            let mut mods = Mods::new(read.clone(), send.clone());
+            let mut mods = Mods::new();
             let names = send.send(&mut mods, send_refs);
             read.read(&mut mods, read_refs, names);
             mods.apply(self);
@@ -42,13 +51,23 @@ impl Pipl {
 }
 #[derive(Debug)]
 struct ReadReaction {
-    read: Rc<OnRead>,
+    read: ReadMolecule,
     refs: Refs,
+}
+impl ReadReaction {
+    fn new(read: ReadMolecule, refs: Refs) -> Self {
+        ReadReaction { read, refs }
+    }
 }
 #[derive(Debug)]
 struct SendReaction {
-    send: Rc<OnSend>,
+    send: SendMolecule,
     refs: Refs,
+}
+impl SendReaction {
+    fn new(send: SendMolecule, refs: Refs) -> Self {
+        SendReaction { send, refs }
+    }
 }
 #[derive(Debug)]
 struct ReactionMap {
@@ -62,28 +81,31 @@ impl ReactionMap {
             queue: Vec::new(),
         }
     }
-    fn add_read(&mut self, name: Name, read: ReadReaction) {
+    fn add_read(&mut self, reaction: ReadReaction) {
+        let name = reaction.refs.get(&reaction.read.name());
         let queue = self.map
             .entry(name.clone())
             .or_insert(ReactionQueue::new());
-        queue.add_read(read);
+        queue.add_read(reaction);
         if queue.is_ready() {
-            self.queue.push(name.clone());
+            self.queue.push(name);
         }
     }
-    fn add_send(&mut self, name: Name, send: SendReaction) {
+    fn add_send(&mut self, reaction: SendReaction) {
+        let name = reaction.refs.get(&reaction.send.name());
         let queue = self.map
             .entry(name.clone())
             .or_insert(ReactionQueue::new());
-        queue.add_send(send);
+        queue.add_send(reaction);
         if queue.is_ready() {
-            self.queue.push(name.clone());
+            self.queue.push(name);
         }
     }
     fn next(&mut self) -> Option<(ReadReaction, SendReaction)> {
         if self.queue.len() > 0 {
             let name = self.queue.remove(0);
-            Some(self.map.get_mut(&name).unwrap().take())
+            let (reader, sender) = self.map.get_mut(&name).unwrap().take();
+            Some((reader, sender))
         }
         else {
             None

@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-pub use pipl_engine::{Mods, Name, OnRead, OnSend, Pipl, Refs};
+pub use pipl_engine::{Mods, Molecule, Name, OnRead, OnSend, Pipl, ReadMolecule, Refs, SendMolecule};
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;
@@ -25,8 +25,17 @@ impl Results {
             .unwrap().clone()
     }
 }
+pub fn unslice<T: Clone>(slice: &[&T]) -> Vec<T> {
+    slice.iter().map(|&x| x.clone()).collect()
+}
 pub fn n<T: fmt::Debug +'static>(name: T) -> Name {
     Name::new(name)
+}
+pub fn read(name: &Name, read: Rc<OnRead>) -> Molecule {
+    Molecule::from(ReadMolecule::new(name.clone(), read))
+}
+pub fn send(name: &Name, send: Rc<OnSend>) -> Molecule {
+    Molecule::from(SendMolecule::new(name.clone(), send))
 }
 fn diff<'a, T: Eq + Hash>(left: &'a HashSet<T>, right: &'a HashSet<T>) -> (HashSet<&'a T>, HashSet<&'a T>) {
     let diff_left = left.difference(&right).collect::<HashSet<_>>();
