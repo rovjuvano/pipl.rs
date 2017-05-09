@@ -38,6 +38,12 @@ impl Pipl {
     fn add_send(&mut self, send: SendMolecule, refs: Refs) {
         self.map.add_send(SendReaction::new(send, refs));
     }
+    fn remove_molecule(&mut self, molecule: Molecule, refs: Refs) {
+        match molecule {
+            Molecule::Read(read) => self.map.remove_read(read.name(), refs),
+            Molecule::Send(send) => self.map.remove_send(send.name(), refs),
+        }
+    }
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
             let ReadReaction { read, refs: read_refs } = reader;
@@ -101,15 +107,29 @@ impl ReactionMap {
             self.queue.push(name);
         }
     }
+    fn remove_read(&mut self, name: &Name, refs: Refs) {
+        if let Some(queue) = self.map.get_mut(name) {
+            queue.remove_read(refs);
+        }
+    }
+    fn remove_send(&mut self, name: &Name, refs: Refs) {
+        if let Some(queue) = self.map.get_mut(name) {
+            queue.remove_send(refs);
+        }
+    }
     fn next(&mut self) -> Option<(ReadReaction, SendReaction)> {
-        if self.queue.len() > 0 {
-            let name = self.queue.remove(0);
-            let (reader, sender) = self.map.get_mut(&name).unwrap().take();
-            Some((reader, sender))
+        if self.queue.is_empty() {
+            return None
         }
         else {
-            None
+            let name = self.queue.remove(0);
+            if let Some(queue) = self.map.get_mut(&name) {
+                if queue.is_ready() {
+                    return Some(queue.take())
+                }
+            }
         }
+        self.next()
     }
 }
 #[derive(Debug)]
@@ -129,6 +149,12 @@ impl ReactionQueue {
     }
     fn add_send(&mut self, send: SendReaction) {
         self.sends.push(send);
+    }
+    fn remove_read(&mut self, refs: Refs) {
+        self.reads.retain(|x| x.refs != refs);
+    }
+    fn remove_send(&mut self, refs: Refs) {
+        self.sends.retain(|x| x.refs != refs);
     }
     fn is_ready(&self) -> bool {
         ! self.reads.is_empty() && ! self.sends.is_empty()

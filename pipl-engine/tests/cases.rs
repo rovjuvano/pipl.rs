@@ -7,4 +7,5 @@ mod cases {
     mod repeating_read_prefix;
     mod repeating_send_prefix;
     mod terminate_parallel;
+    mod terminate_choice;
 }
