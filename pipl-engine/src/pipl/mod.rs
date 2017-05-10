@@ -9,7 +9,7 @@ use ::SendMolecule;
 use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Pipl {
-    map: ReactionMap
+    map: ReactionMap,
 }
 impl Pipl {
     pub fn new() -> Self {
@@ -77,91 +77,96 @@ impl SendReaction {
 }
 #[derive(Debug)]
 struct ReactionMap {
-    map: HashMap<Name, ReactionQueue>,
-    queue: Vec<Name>,
+    reads: HashMap<Name, Vec<ReadReaction>>,
+    sends: HashMap<Name, Vec<SendReaction>>,
+    pairs: HashMap<Name, (Vec<ReadReaction>, Vec<SendReaction>)>,
 }
 impl ReactionMap {
     fn new() -> Self {
         ReactionMap {
-            map: HashMap::new(),
-            queue: Vec::new(),
-        }
-    }
-    fn add_read(&mut self, reaction: ReadReaction) {
-        let name = reaction.refs.get(&reaction.read.name());
-        let queue = self.map
-            .entry(name.clone())
-            .or_insert(ReactionQueue::new());
-        queue.add_read(reaction);
-        if queue.is_ready() {
-            self.queue.push(name);
-        }
-    }
-    fn add_send(&mut self, reaction: SendReaction) {
-        let name = reaction.refs.get(&reaction.send.name());
-        let queue = self.map
-            .entry(name.clone())
-            .or_insert(ReactionQueue::new());
-        queue.add_send(reaction);
-        if queue.is_ready() {
-            self.queue.push(name);
-        }
-    }
-    fn remove_read(&mut self, name: &Name, refs: Refs) {
-        if let Some(queue) = self.map.get_mut(name) {
-            queue.remove_read(refs);
-        }
-    }
-    fn remove_send(&mut self, name: &Name, refs: Refs) {
-        if let Some(queue) = self.map.get_mut(name) {
-            queue.remove_send(refs);
-        }
-    }
-    fn next(&mut self) -> Option<(ReadReaction, SendReaction)> {
-        if self.queue.is_empty() {
-            return None
-        }
-        else {
-            let name = self.queue.remove(0);
-            if let Some(queue) = self.map.get_mut(&name) {
-                if queue.is_ready() {
-                    return Some(queue.take())
-                }
-            }
-        }
-        self.next()
-    }
-}
-#[derive(Debug)]
-struct ReactionQueue {
-    reads: Vec<ReadReaction>,
-    sends: Vec<SendReaction>,
-}
-impl ReactionQueue {
-    fn new() -> Self {
-        ReactionQueue {
-            reads: Vec::new(),
-            sends: Vec::new(),
+            reads: HashMap::new(),
+            sends: HashMap::new(),
+            pairs: HashMap::new(),
         }
     }
     fn add_read(&mut self, read: ReadReaction) {
-        self.reads.push(read);
+        let name = read.refs.get(&read.read.name());
+        if let Some(&mut (ref mut reads, _)) = self.pairs.get_mut(&name) {
+            reads.push(read);
+            return;
+        }
+        if let Some(sends) = self.sends.remove(&name) {
+            self.pairs.insert(name, (vec![read], sends));
+        }
+        else {
+            self.reads.entry(name).or_insert(Vec::new()).push(read);
+        }
     }
     fn add_send(&mut self, send: SendReaction) {
-        self.sends.push(send);
+        let name = send.refs.get(&send.send.name());
+        if let Some(&mut (_, ref mut sends)) = self.pairs.get_mut(&name) {
+            sends.push(send);
+            return;
+        }
+        if let Some(reads) = self.reads.remove(&name) {
+            self.pairs.insert(name, (reads, vec![send]));
+        }
+        else {
+            self.sends.entry(name).or_insert(Vec::new()).push(send);
+        }
     }
-    fn remove_read(&mut self, refs: Refs) {
-        self.reads.retain(|x| x.refs != refs);
+    fn remove_read(&mut self, name: &Name, refs: Refs) {
+        if let Some((mut reads, sends)) = self.pairs.remove(&name) {
+            reads.retain(|x| x.refs != refs);
+            if reads.is_empty() {
+                self.sends.insert(name.clone(), sends);
+            }
+            else {
+                self.pairs.insert(name.clone(), (reads, sends));
+            }
+        }
+        else if let Some(mut reads) = self.reads.remove(name) {
+            reads.retain(|x| x.refs != refs);
+            if !reads.is_empty() {
+                self.reads.insert(name.clone(), reads);
+            }
+        }
     }
-    fn remove_send(&mut self, refs: Refs) {
-        self.sends.retain(|x| x.refs != refs);
+    fn remove_send(&mut self, name: &Name, refs: Refs) {
+        if let Some((reads, mut sends)) = self.pairs.remove(&name) {
+            sends.retain(|x| x.refs != refs);
+            if sends.is_empty() {
+                self.reads.insert(name.clone(), reads);
+            }
+            else {
+                self.pairs.insert(name.clone(), (reads, sends));
+            }
+        }
+        else if let Some(mut sends) = self.sends.remove(name) {
+            sends.retain(|x| x.refs != refs);
+            if !sends.is_empty() {
+                self.sends.insert(name.clone(), sends);
+            }
+        }
     }
-    fn is_ready(&self) -> bool {
-        ! self.reads.is_empty() && ! self.sends.is_empty()
-    }
-    fn take(&mut self) -> (ReadReaction, SendReaction) {
-        let read = self.reads.remove(0);
-        let send = self.sends.remove(0);
-        (read, send)
+    fn next(&mut self) -> Option<(ReadReaction, SendReaction)> {
+        let name = match self.pairs.keys().nth(0) {
+            Some(name) => Some(name.clone()),
+            None => None,
+        };
+        if let Some(name) = name {
+            if let Some((mut reads, mut sends)) = self.pairs.remove(&name) {
+                let read = reads.remove(0);
+                let send = sends.remove(0);
+                match (reads.is_empty(), sends.is_empty()) {
+                    (false, false) => { self.pairs.insert(name.clone(), (reads, sends)); },
+                    (false, true) => { self.reads.insert(name.clone(), reads); },
+                    (true, false) => { self.sends.insert(name.clone(), sends); },
+                    (true, true) => {},
+                };
+                return Some((read, send))
+            }
+        }
+        None
     }
 }
