@@ -88,43 +88,32 @@ impl ChoiceReaction {
     fn new(molecules: Vec<Molecule>, refs: Refs) -> Self {
         ChoiceReaction { molecules, refs }
     }
-    fn collapse_read(self, name: &Name) -> ReadReaction {
+    fn collapse(self, name: &Name, is_read: bool) -> (Molecule, Refs) {
         let ChoiceReaction { mut molecules, refs } = self;
-        let m = molecules.drain(..)
+        let molecule = molecules.drain(..)
             .filter(|x| {
                 match *x {
-                    Molecule::Read(ref read) => &refs.get(read.name()) == name,
-                    _ => false,
+                    Molecule::Read(ref read) => is_read && refs.get(read.name()) == *name,
+                    Molecule::Send(ref send) => !is_read && refs.get(send.name()) == *name,
                 }
             })
             .nth(0)
-            .map(|x| {
-                match x {
-                    Molecule::Read(read) => read,
-                    _ => unreachable!(),
-                }
-            })
             .unwrap();
-        ReadReaction::new(m, refs)
+        (molecule, refs)
+    }
+    fn collapse_read(self, name: &Name) -> ReadReaction {
+        let (molecule, refs) = self.collapse(name, true);
+        match molecule {
+            Molecule::Read(read) => ReadReaction::new(read, refs),
+            Molecule::Send(_) => unreachable!(),
+        }
     }
     fn collapse_send(self, name: &Name) -> SendReaction {
-        let ChoiceReaction { mut molecules, refs } = self;
-        let m = molecules.drain(..)
-            .filter(|x| {
-                match *x {
-                    Molecule::Send(ref send) => &refs.get(send.name()) == name,
-                    _ => false,
-                }
-            })
-            .nth(0)
-            .map(|x| {
-                match x {
-                    Molecule::Send(send) => send,
-                    _ => unreachable!(),
-                }
-            })
-            .unwrap();
-        SendReaction::new(m, refs)
+        let (molecule, refs) = self.collapse(name, false);
+        match molecule {
+            Molecule::Read(_) => unreachable!(),
+            Molecule::Send(send) => SendReaction::new(send, refs),
+        }
     }
 }
 #[derive(Debug)]
@@ -146,44 +135,34 @@ impl ReactionMap {
         for m in &choice.molecules {
             let reaction = Reaction::Choice(choice.clone());
             match *m {
-                Molecule::Read(ref read) => self.add_read_reaction(choice.refs.get(read.name()), reaction),
-                Molecule::Send(ref send) => self.add_send_reaction(choice.refs.get(send.name()), reaction),
+                Molecule::Read(ref read) => self.add_reaction(choice.refs.get(read.name()), reaction, true),
+                Molecule::Send(ref send) => self.add_reaction(choice.refs.get(send.name()), reaction, false),
             }
+        }
+    }
+    fn add_reaction(&mut self, name: Name, reaction: Reaction, is_read: bool) {
+        if let Some(&mut (ref mut reads, ref mut sends)) = self.pairs.get_mut(&name) {
+            select(is_read, reads, sends).push(reaction);
+            return;
+        }
+        if let Some(that) = select(is_read, &mut self.sends, &mut self.reads).remove(&name) {
+            let pair = if is_read { (vec![reaction], that) } else { (that, vec![reaction]) };
+            self.pairs.insert(name, pair);
+        }
+        else {
+            select(is_read, &mut self.reads, &mut self.sends)
+                .entry(name).or_insert(Vec::new()).push(reaction);
         }
     }
     fn add_read(&mut self, read: ReadReaction) {
         let name = read.refs.get(read.read.name());
         let reaction = Reaction::Read(read);
-        self.add_read_reaction(name, reaction);
-    }
-    fn add_read_reaction(&mut self, name: Name, reaction: Reaction) {
-        if let Some(&mut (ref mut reads, _)) = self.pairs.get_mut(&name) {
-            reads.push(reaction);
-            return;
-        }
-        if let Some(sends) = self.sends.remove(&name) {
-            self.pairs.insert(name, (vec![reaction], sends));
-        }
-        else {
-            self.reads.entry(name).or_insert(Vec::new()).push(reaction);
-        }
+        self.add_reaction(name, reaction, true);
     }
     fn add_send(&mut self, send: SendReaction) {
         let name = send.refs.get(send.send.name());
         let reaction = Reaction::Send(send);
-        self.add_send_reaction(name, reaction);
-    }
-    fn add_send_reaction(&mut self, name: Name, reaction: Reaction) {
-        if let Some(&mut (_, ref mut sends)) = self.pairs.get_mut(&name) {
-            sends.push(reaction);
-            return;
-        }
-        if let Some(reads) = self.reads.remove(&name) {
-            self.pairs.insert(name, (reads, vec![reaction]));
-        }
-        else {
-            self.sends.entry(name).or_insert(Vec::new()).push(reaction);
-        }
+        self.add_reaction(name, reaction, false);
     }
     fn collapse_read(&mut self, reaction: Reaction, name: &Name) -> ReadReaction {
         match reaction {
@@ -207,45 +186,30 @@ impl ReactionMap {
             }
         })
     }
-    fn remove_read(&mut self, name: &Name, choice: &Rc<ChoiceReaction>) {
-        if let Some((mut reads, sends)) = self.pairs.remove(&name) {
-            Self::remove_option(&mut reads, choice);
-            if reads.is_empty() {
-                self.sends.insert(name.clone(), sends);
+    fn remove_choice(&mut self, name: &Name, choice: &Rc<ChoiceReaction>, is_read: bool) {
+        if let Some((mut reads, mut sends)) = self.pairs.remove(&name) {
+            Self::remove_option(select(is_read, &mut reads, &mut sends), choice);
+            if select(is_read, &mut reads, &mut sends).is_empty() {
+                select(is_read, &mut self.reads, &mut self.sends)
+                    .insert(name.clone(), select(is_read, sends, reads));
             }
             else {
                 self.pairs.insert(name.clone(), (reads, sends));
             }
         }
-        else if let Some(mut reads) = self.reads.remove(name) {
-            Self::remove_option(&mut reads, choice);
-            if !reads.is_empty() {
-                self.reads.insert(name.clone(), reads);
-            }
-        }
-    }
-    fn remove_send(&mut self, name: &Name, choice: &Rc<ChoiceReaction>) {
-        if let Some((reads, mut sends)) = self.pairs.remove(&name) {
-            Self::remove_option(&mut sends, choice);
-            if sends.is_empty() {
-                self.reads.insert(name.clone(), reads);
-            }
-            else {
-                self.pairs.insert(name.clone(), (reads, sends));
-            }
-        }
-        else if let Some(mut sends) = self.sends.remove(name) {
-            Self::remove_option(&mut sends, choice);
-            if !sends.is_empty() {
-                self.sends.insert(name.clone(), sends);
+        else if let Some(mut set) = select(is_read, &mut self.reads, &mut self.sends).remove(name) {
+            Self::remove_option(&mut set, choice);
+            if !set.is_empty() {
+                select(is_read, &mut self.reads, &mut self.sends)
+                    .insert(name.clone(), set);
             }
         }
     }
     fn unwrap_choice(&mut self, choice: Rc<ChoiceReaction>) -> ChoiceReaction {
         for m in &choice.molecules {
             match *m {
-                Molecule::Read(ref read) => self.remove_read(read.name(), &choice),
-                Molecule::Send(ref send) => self.remove_send(send.name(), &choice),
+                Molecule::Read(ref read) => self.remove_choice(read.name(), &choice, true),
+                Molecule::Send(ref send) => self.remove_choice(send.name(), &choice, false),
             }
         }
         Rc::try_unwrap(choice).unwrap()
@@ -272,4 +236,8 @@ impl ReactionMap {
         }
         None
     }
+}
+#[inline]
+fn select<T>(condition: bool, this: T, that: T) -> T {
+    if condition { this } else { that }
 }
