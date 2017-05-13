@@ -6,7 +6,7 @@ pub struct Mods {
 }
 enum Mod {
     Add(Molecule, Refs),
-    Remove(Molecule, Refs),
+    Choice(Vec<Molecule>, Refs),
 }
 impl Mods {
     pub fn new() -> Mods {
@@ -17,14 +17,14 @@ impl Mods {
     pub fn add<T: Into<Molecule>>(&mut self, molecule: T, refs: Refs) {
         self.mods.push(Mod::Add(molecule.into(), refs));
     }
-    pub fn remove<T: Into<Molecule>>(&mut self, molecule: T, refs: Refs) {
-        self.mods.push(Mod::Remove(molecule.into(), refs));
+    pub fn choice<T: Into<Molecule>>(&mut self, options: Vec<T>, refs: Refs) {
+        self.mods.push(Mod::Choice(options.into_iter().map(|x| x.into()).collect(), refs));
     }
     pub fn apply(self, pipl: &mut Pipl) {
         for m in self.mods {
             match m {
                 Mod::Add(molecule, refs) => pipl.add_molecule(molecule, refs),
-                Mod::Remove(molecule, refs) => pipl.remove_molecule(molecule, refs),
+                Mod::Choice(molecules, refs) => pipl.add_choice(molecules, refs),
             }
         }
     }

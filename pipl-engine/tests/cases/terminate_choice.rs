@@ -1,33 +1,4 @@
 use helpers::*;
-use std::cell::RefCell;
-#[derive(Debug)]
-struct Choice {
-    options: Rc<RefCell<Vec<Molecule>>>,
-    next: Molecule,
-}
-impl OnRead for Choice {
-    fn read(&self, mods: &mut Mods, _read: ReadMolecule, refs: Refs, names: Vec<Name>) {
-        for molecule in self.options.borrow().iter() {
-            mods.remove(molecule.clone(), refs.clone());
-        }
-        if let Molecule::Read(ref next) = self.next {
-            next.clone().read(mods, refs, names);
-        }
-    }
-}
-impl OnSend for Choice {
-    fn send(&self, mods: &mut Mods, _send: SendMolecule, refs: Refs) -> Vec<Name> {
-        for molecule in self.options.borrow().iter() {
-            mods.remove(molecule.clone(), refs.clone());
-        }
-        if let Molecule::Send(ref next) = self.next {
-            next.clone().send(mods, refs)
-        }
-        else {
-            Vec::new()
-        }
-    }
-}
 #[derive(Debug)]
 struct Read {
     results: Rc<Results>,
@@ -50,16 +21,7 @@ impl OnRead for Read {
     fn read(&self, mods: &mut Mods, read: ReadMolecule, mut refs: Refs, names: Vec<Name>) {
         refs.set_names(self.names.clone(), names.clone());
         self.results.log(format!("{}", read.name().raw().downcast_ref::<&str>().unwrap()), Name::new(refs.clone()));
-        let options = Rc::new(RefCell::new(Vec::new()));
-        for molecule in self.next.iter() {
-            let choice = Rc::new(Choice { options: options.clone(), next: molecule.clone() });
-            let choice = match *molecule {
-                Molecule::Read(ref read) => Molecule::from(ReadMolecule::new(read.name().clone(), choice)),
-                Molecule::Send(ref send) => Molecule::from(SendMolecule::new(send.name().clone(), choice)),
-            };
-            options.borrow_mut().push(choice.clone());
-            mods.add(choice, refs.clone());
-        }
+        mods.choice(self.next.clone(), refs);
     }
 }
 #[derive(Debug)]
