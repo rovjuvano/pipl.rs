@@ -9,4 +9,5 @@ mod cases {
     mod terminate_parallel;
     mod terminate_choice;
     mod no_names;
+    mod polyadic;
 }
