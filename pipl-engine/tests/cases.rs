@@ -8,4 +8,5 @@ mod cases {
     mod repeating_send_prefix;
     mod terminate_parallel;
     mod terminate_choice;
+    mod no_names;
 }
