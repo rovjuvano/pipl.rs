@@ -112,7 +112,7 @@ impl ReactionQueue {
     }
     fn remove(&mut self, refs: &Refs) {
         if let Some(i) = self.0.iter().position(|x| {
-            ::ptr_eq(x.refs(), refs)
+            ::std::ptr::eq(x.refs(), refs)
         }) {
             self.0.remove(i);
         }

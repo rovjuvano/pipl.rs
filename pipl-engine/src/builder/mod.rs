@@ -50,7 +50,7 @@ pub struct PrefixBuilder {
     repeating: bool,
     restricts: Vec<Name>,
     names: Vec<Name>,
-    call: Option<Rc<Call>>,
+    call: Option<Rc<dyn Call>>,
     next: Box<Builder>,
 }
 impl PrefixBuilder {
@@ -81,7 +81,7 @@ impl PrefixBuilder {
         self
     }
     /// set callback to call between communication and next process
-    pub fn call<'a>(&'a mut self, call: Rc<Call>) -> &'a mut Self {
+    pub fn call<'a>(&'a mut self, call: Rc<dyn Call>) -> &'a mut Self {
         self.call = Some(call);
         self
     }

@@ -7,7 +7,7 @@ pub enum Action {
     Repeat,
     Restrict(Vec<Name>),
     Communicate(Vec<Name>),
-    Call(Rc<Call>),
+    Call(Rc<dyn Call>),
     Prefix(Rc<Prefix>),
     Parallel(Vec<Rc<Prefix>>),
     Choice(Vec<Rc<Prefix>>),
