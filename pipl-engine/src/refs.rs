@@ -1,47 +1,52 @@
 use ::name::Name;
 use std::collections::HashMap;
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Refs {
-    refs: HashMap<Name, Name>,
+#[derive(Debug, Eq, PartialEq)]
+pub struct Refs<T> {
+    refs: HashMap<Name<T>, Name<T>>,
 }
-impl Refs {
-    pub fn new() -> Refs {
+impl<T> Refs<T> {
+    pub fn new() -> Self {
         Refs { refs: HashMap::new() }
     }
-    pub fn get(&self, key: &Name) -> Name {
+    pub fn get(&self, key: &Name<T>) -> Name<T> {
         self.refs.get(key).unwrap_or(key).clone()
     }
-    pub fn get_names(&self, keys: &[Name]) -> Vec<Name> {
+    pub fn get_names(&self, keys: &[Name<T>]) -> Vec<Name<T>> {
         keys.iter().map(|k| {
             self.get(k)
         }).collect()
     }
-    pub fn keys(&self) -> Vec<&Name> {
+    pub fn keys(&self) -> Vec<&Name<T>> {
         self.refs.keys().collect()
     }
-    pub fn new_name(&mut self, key: Name) {
+    pub fn new_name(&mut self, key: Name<T>) {
         let value = key.dup();
-        self.set(key, value);
+        self.set(key.clone(), value.clone());
     }
-    pub fn new_names(&mut self, keys: Vec<Name>) {
+    pub fn new_names(&mut self, keys: Vec<Name<T>>) {
         for k in keys.into_iter() {
             self.new_name(k);
         }
     }
-    pub fn set(&mut self, key: Name, value: Name) {
+    pub fn set(&mut self, key: Name<T>, value: Name<T>) {
         self.refs.insert(key, value);
     }
-    pub fn set_names(&mut self, keys: Vec<Name>, values: Vec<Name>) {
+    pub fn set_names(&mut self, keys: Vec<Name<T>>, values: Vec<Name<T>>) {
         for (k, v) in keys.into_iter().zip(values) {
             self.set(k, v);
         }
+    }
+}
+impl<T> Clone for Refs<T> {
+    fn clone(&self) -> Self {
+        Refs { refs: self.refs.clone() }
     }
 }
 #[cfg(test)]
 mod tests {
     use super::Name;
     use super::Refs;
-    fn n(name: u8) -> Name {
+    fn n<T>(name: T) -> Name<T> {
         Name::new(name)
     }
     #[test]

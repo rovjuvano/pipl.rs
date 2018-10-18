@@ -3,10 +3,26 @@ use pipl_engine::{Call, Name, Pipl, PiplBuilder, Refs};
 use std::env;
 use std::fmt;
 use std::rc::Rc;
-fn n<T: fmt::Debug + 'static>(name: T) -> Name {
-    Name::new(name)
+#[derive(Debug)]
+enum N {
+    String(&'static str),
+    Usize(usize),
 }
-fn add_factorial(builder: &mut PiplBuilder, greater_than: &Name, subtract: &Name, multiply: &Name) -> Name {
+fn n(value: &'static str) -> Name<N> {
+    Name::new(N::String(value))
+}
+fn nn(value: usize) -> Name<N> {
+    Name::new(N::Usize(value))
+}
+impl fmt::Display for N {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    match self {
+      N::String(x) => x.fmt(f),
+      N::Usize(x) => x.fmt(f),
+    }
+  }
+}
+fn add_factorial(builder: &mut PiplBuilder<N>, greater_than: &Name<N>, subtract: &Name<N>, multiply: &Name<N>) -> Name<N> {
     let fact = n("fact");
     let x = &n("x");
     let out = &n("out");
@@ -22,7 +38,7 @@ fn add_factorial(builder: &mut PiplBuilder, greater_than: &Name, subtract: &Name
             .repeat()
             .send(greater_than)
                 .restrict(&[gt2, le2])
-                .names(&[x, &n(2usize), gt2, le2])
+                .names(&[x, &nn(2usize), gt2, le2])
                 .choice();
     c.read(le2)
         .send(out)
@@ -31,7 +47,7 @@ fn add_factorial(builder: &mut PiplBuilder, greater_than: &Name, subtract: &Name
         .parallel()
             .restrict(&[t1, t2, t3]);
     p.send(subtract)
-        .names(&[x, &n(1usize), t1]);
+        .names(&[x, &nn(1usize), t1]);
     p.read(t1)
         .names(&[x_minus_1])
         .send(&fact)
@@ -46,17 +62,13 @@ fn add_factorial(builder: &mut PiplBuilder, greater_than: &Name, subtract: &Name
             .names(&[result]);
     fact
 }
-fn add_print(builder: &mut PiplBuilder) -> Name {
+fn add_print(builder: &mut PiplBuilder<N>) -> Name<N> {
     #[derive(Debug)]
-    struct PrintCall(Name);
-    impl Call for PrintCall {
-        fn call(&self, refs: Refs) -> Refs {
+    struct PrintCall(Name<N>);
+    impl Call<N> for PrintCall {
+        fn call(&self, refs: Refs<N>) -> Refs<N> {
             let s = refs.get(&self.0);
-            if s.raw().is::<usize>() {
-                println!("{}", s.raw().downcast_ref::<usize>().unwrap());
-            } else {
-                println!("Unknown value type: {:?}", s);
-            }
+            println!("{}", s.raw());
             refs
         }
     }
@@ -68,23 +80,25 @@ fn add_print(builder: &mut PiplBuilder) -> Name {
         .call(Rc::new(PrintCall(arg)));
     name
 }
-fn add_greater_than(builder: &mut PiplBuilder) -> Name {
+fn add_greater_than(builder: &mut PiplBuilder<N>) -> Name<N> {
     #[derive(Debug)]
     struct GreaterThanCall {
-        a: Name,
-        b: Name,
-        gt: Name,
-        lte: Name,
-        out: Name,
+        a: Name<N>,
+        b: Name<N>,
+        gt: Name<N>,
+        lte: Name<N>,
+        out: Name<N>,
     }
-    impl Call for GreaterThanCall {
-        fn call(&self, mut refs: Refs) -> Refs {
-            if refs.get(&self.a).raw().is::<usize>() && refs.get(&self.b).raw().is::<usize>() {
-                let a = *refs.get(&self.a).raw().downcast_ref::<usize>().unwrap();
-                let b = *refs.get(&self.b).raw().downcast_ref::<usize>().unwrap();
-                let result = refs.get(if a > b { &self.gt } else { &self.lte });
-                refs.set(self.out.clone(), result);
-            }
+    impl Call<N> for GreaterThanCall {
+        fn call(&self, mut refs: Refs<N>) -> Refs<N> {
+            let (tf, result) = match ( refs.get(&self.a).raw(), refs.get(&self.b).raw() ) {
+                ( N::Usize(a), N::Usize(b) ) => {
+                  let x = if a > b { &self.gt } else { &self.lte };
+                  (true, refs.get(x))
+                },
+                _ => { unreachable!(); },
+            };
+            if tf { refs.set(self.out.clone(), result) }
             refs
         }
     }
@@ -105,9 +119,9 @@ fn add_greater_than(builder: &mut PiplBuilder) -> Name {
 struct BinaryOpCall {
     label: String,
     f: Box<Fn(usize, usize) -> usize>,
-    a: Name,
-    b: Name,
-    out: Name,
+    a: Name<N>,
+    b: Name<N>,
+    out: Name<N>,
 }
 impl fmt::Debug for BinaryOpCall {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -118,18 +132,17 @@ impl fmt::Debug for BinaryOpCall {
             .finish()
     }
 }
-impl Call for BinaryOpCall {
-    fn call(&self, mut refs: Refs) -> Refs {
-        if refs.get(&self.a).raw().is::<usize>() && refs.get(&self.b).raw().is::<usize>() {
-            let a = *refs.get(&self.a).raw().downcast_ref::<usize>().unwrap();
-            let b = *refs.get(&self.b).raw().downcast_ref::<usize>().unwrap();
-            let result = (self.f)(a, b);
-            refs.set(self.out.clone(), Name::new(result));
-        }
+impl Call<N> for BinaryOpCall {
+    fn call(&self, mut refs: Refs<N>) -> Refs<N> {
+        let (tf, result) = match ( refs.get(&self.a).raw(), refs.get(&self.b).raw() ) {
+            ( N::Usize(a), N::Usize(b) ) => (true, (self.f)(*a, *b) ),
+            _ => { unreachable!(); },
+        };
+        if tf { refs.set(self.out.clone(), nn(result)); }
         refs
     }
 }
-fn add_binary_op<T>(builder: &mut PiplBuilder, label: &str, f: T) -> Name
+fn add_binary_op<T>(builder: &mut PiplBuilder<N>, label: &str, f: T) -> Name<N>
     where T: Fn(usize, usize) -> usize + 'static
 {
     let name = n("-");
@@ -147,10 +160,10 @@ fn add_binary_op<T>(builder: &mut PiplBuilder, label: &str, f: T) -> Name
            .names(&[&result]);
     name
 }
-fn add_subtract(builder: &mut PiplBuilder) -> Name {
+fn add_subtract(builder: &mut PiplBuilder<N>) -> Name<N> {
     add_binary_op(builder, "-", |a, b| { a - b })
 }
-fn add_multiply(builder: &mut PiplBuilder) -> Name {
+fn add_multiply(builder: &mut PiplBuilder<N>) -> Name<N> {
     add_binary_op(builder, "*", |a, b| { a * b })
 }
 fn main() {
@@ -164,7 +177,7 @@ fn main() {
     builder.apply(pipl);
     for arg in env::args().skip(1) {
         let x = usize::from_str_radix(&arg, 10).unwrap();
-        builder.send(fact).names(&[&n(x), print]);
+        builder.send(fact).names(&[&nn(x), print]);
         builder.apply(pipl);
         for _ in 0..999 {
             pipl.step();

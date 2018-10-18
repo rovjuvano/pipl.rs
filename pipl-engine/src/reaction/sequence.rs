@@ -6,26 +6,26 @@ use ::prefix::Prefix;
 use ::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
-pub struct SequenceReaction {
-    refs: Refs,
-    prefix: Rc<Prefix>,
+pub struct SequenceReaction<T> {
+    refs: Refs<T>,
+    prefix: Rc<Prefix<T>>,
 }
-impl SequenceReaction {
-    pub fn new(refs: Refs, prefix: Rc<Prefix>) -> Self {
+impl<T> SequenceReaction<T> {
+    pub fn new(refs: Refs<T>, prefix: Rc<Prefix<T>>) -> Self {
         SequenceReaction { refs: refs, prefix: prefix }
     }
-    pub fn channels(&self) -> Vec<&Channel> {
+    pub fn channels(&self) -> Vec<&Channel<T>> {
         vec![self.prefix.channel()]
     }
-    pub fn read(self, mods: &mut Mods, names: Vec<Name>) {
+    pub fn read(self, mods: &mut Mods<T>, names: Vec<Name<T>>) {
         let SequenceReaction { refs, prefix } = self;
         Self::react(mods, refs, prefix, Some(names));
     }
-    pub fn send(self, mods: &mut Mods) -> Vec<Name> {
+    pub fn send(self, mods: &mut Mods<T>) -> Vec<Name<T>> {
         let SequenceReaction { refs, prefix } = self;
         Self::react(mods, refs, prefix, None).unwrap_or_else(|| Vec::new())
     }
-    fn react(mods: &mut Mods, mut refs: Refs, prefix: Rc<Prefix>, read_names: Option<Vec<Name>>) -> Option<Vec<Name>> {
+    fn react(mods: &mut Mods<T>, mut refs: Refs<T>, prefix: Rc<Prefix<T>>, read_names: Option<Vec<Name<T>>>) -> Option<Vec<Name<T>>> {
         let mut send_names = None;
         let mut iter = prefix.actions().iter();
         let mut action = iter.next();
@@ -66,7 +66,7 @@ impl SequenceReaction {
         send_names
     }
     #[inline]
-    pub fn refs(&self) -> &Refs {
+    pub fn refs(&self) -> &Refs<T> {
         &self.refs
     }
 }

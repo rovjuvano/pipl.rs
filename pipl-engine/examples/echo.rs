@@ -1,44 +1,42 @@
 extern crate pipl_engine;
 use pipl_engine::{Call, Name, Pipl, PiplBuilder, Refs};
 use std::env;
-use std::fmt;
 use std::rc::Rc;
-fn n<T: fmt::Debug + 'static>(name: T) -> Name {
-    Name::new(name)
+type N = String;
+fn n(value: String) -> Name<N> {
+    Name::new(value)
 }
 #[derive(Debug)]
 struct EchoCall {
-    name: Name,
+    name: Name<N>,
 }
 impl EchoCall {
-    fn new(name: Name) -> Self {
+    fn new(name: Name<N>) -> Self {
         EchoCall { name: name }
     }
 }
-impl Call for EchoCall {
-    fn call(&self, refs: Refs) -> Refs {
+impl Call<N> for EchoCall {
+    fn call(&self, refs: Refs<N>) -> Refs<N> {
         let s = refs.get(&self.name);
-        if s.raw().is::<String>() {
-            println!("{}", s.raw().downcast_ref::<String>().unwrap());
-        }
+        println!("{}", s.raw());
         refs
     }
 }
-fn make_read(builder: &mut PiplBuilder, echo: &Name) {
-    let arg = n(());
+fn make_read(builder: &mut PiplBuilder<N>, echo: &Name<N>) {
+    let arg = n("".to_owned());
     builder.read(echo)
         .names(&[&arg])
         .repeat()
         .call(Rc::new(EchoCall::new(arg)));
 }
-fn make_send(builder: &mut PiplBuilder, echo: &Name, arg: String) {
+fn make_send(builder: &mut PiplBuilder<N>, echo: &Name<N>, arg: String) {
     builder.send(echo)
         .names(&[&n(arg)]);
 }
 fn main() {
     let mut pipl = Pipl::new();
     let mut builder = PiplBuilder::new();
-    let echo = &n("echo");
+    let echo = &n("echo".to_owned());
     make_read(&mut builder, echo);
     for arg in env::args().skip(1) {
         make_send(&mut builder, echo, arg);

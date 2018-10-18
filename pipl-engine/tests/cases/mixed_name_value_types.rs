@@ -2,7 +2,7 @@ use helpers::*;
 #[test]
 fn mixed_name_value_types() {
     // w(x).x[y].() w[z].z(z).()
-    let (w, x, y, z) = (&n("w"), &n('x'), &n(121), &n(vec!["z"]));
+    let (w, x, y, z) = (&n("w"), &N::char('x'), &N::i32(121), &N::vec_str(vec!["z"]));
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
