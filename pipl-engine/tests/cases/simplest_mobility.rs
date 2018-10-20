@@ -16,7 +16,7 @@ impl Read {
     fn new_then(results: &Rc<Results>, names: &[&Name], next: Molecule) -> Rc<Self> {
         Rc::new(Read {
             results: results.clone(),
-            names: names.iter().map(|&x| x.clone()).collect(),
+            names: unslice(names),
             next: Some(next),
         })
     }

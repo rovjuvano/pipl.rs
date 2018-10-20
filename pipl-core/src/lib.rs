@@ -1,3 +1,4 @@
+#![deny(bare_trait_objects)]
 mod atom;
 mod pipl;
 

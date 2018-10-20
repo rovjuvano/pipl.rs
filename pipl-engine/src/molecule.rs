@@ -12,10 +12,10 @@ pub enum Molecule {
 #[derive(Clone, Debug)]
 pub struct ReadMolecule {
     name: Name,
-    read: Rc<OnRead>,
+    read: Rc<dyn OnRead>,
 }
 impl ReadMolecule {
-    pub fn new(name: Name, read: Rc<OnRead>) -> Self {
+    pub fn new(name: Name, read: Rc<dyn OnRead>) -> Self {
         ReadMolecule { name, read }
     }
     #[inline]
@@ -30,10 +30,10 @@ impl ReadMolecule {
 #[derive(Clone, Debug)]
 pub struct SendMolecule {
     name: Name,
-    send: Rc<OnSend>,
+    send: Rc<dyn OnSend>,
 }
 impl SendMolecule {
-    pub fn new(name: Name, send: Rc<OnSend>) -> Self {
+    pub fn new(name: Name, send: Rc<dyn OnSend>) -> Self {
         SendMolecule { name, send }
     }
     #[inline]

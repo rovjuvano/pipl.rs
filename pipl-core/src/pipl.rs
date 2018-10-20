@@ -12,8 +12,8 @@ pub struct Pipl {
 }
 
 enum PiplFunc {
-    Pos(Box<Fn(&mut Pipl) -> Vec<Atom>>),
-    Neg(Box<Fn(&mut Pipl, Vec<Atom>)>),
+    Pos(Box<dyn Fn(&mut Pipl) -> Vec<Atom>>),
+    Neg(Box<dyn Fn(&mut Pipl, Vec<Atom>)>),
 }
 struct PiplAtom {
     atom: Atom,

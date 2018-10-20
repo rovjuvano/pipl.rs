@@ -1,3 +1,4 @@
+#![deny(bare_trait_objects)]
 mod call;
 pub use call::OnRead;
 pub use call::OnSend;
@@ -16,9 +17,3 @@ pub use pipl::mods::Mods;
 
 mod refs;
 pub use refs::Refs;
-
-// issue #36497: std::ptr::eq unstable
-#[inline]
-fn ptr_eq<T: ?Sized>(a: *const T, b: *const T) -> bool {
-    a == b
-}

@@ -1,0 +1,5 @@
+[workspace]
+members = [
+  "pipl-core",
+  "pipl-engine",
+]

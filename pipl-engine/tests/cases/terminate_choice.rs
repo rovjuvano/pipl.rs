@@ -32,7 +32,7 @@ struct Send {
 impl Send {
     fn new(names: &[&Name]) -> Rc<Self> {
         Rc::new(Send {
-            names: names.iter().map(|&x| x.clone()).collect(),
+            names: unslice(names),
             next: None,
         })
     }
