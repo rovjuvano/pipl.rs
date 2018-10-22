@@ -2,14 +2,14 @@ use helpers::*;
 #[derive(Debug)]
 struct Read {
     results: Rc<Results>,
-    names: Vec<Name>,
-    next: Vec<Molecule>,
+    names: Vec<Name<N>>,
+    next: Vec<Molecule<N>>,
 }
 impl Read {
-    fn new(results: &Rc<Results>, names: &[&Name]) -> Rc<Self> {
+    fn new(results: &Rc<Results>, names: &[&Name<N>]) -> Rc<Self> {
         Self::new_then(results, names, Vec::new())
     }
-    fn new_then(results: &Rc<Results>, names: &[&Name], next: Vec<Molecule>) -> Rc<Self> {
+    fn new_then(results: &Rc<Results>, names: &[&Name<N>], next: Vec<Molecule<N>>) -> Rc<Self> {
         Rc::new(Read {
             results: results.clone(),
             names: unslice(names),
@@ -17,10 +17,10 @@ impl Read {
         })
     }
 }
-impl OnRead for Read {
-    fn read(&self, mods: &mut Mods, read: ReadMolecule, mut refs: Refs, names: Vec<Name>) {
+impl OnRead<N> for Read {
+    fn read(&self, mods: &mut Mods<N>, read: ReadMolecule<N>, mut refs: Refs<N>, names: Vec<Name<N>>) {
         refs.set_names(self.names.clone(), names.clone());
-        self.results.log(format!("{}", read.name().raw().downcast_ref::<&str>().unwrap()), Name::new(refs.clone()));
+        self.results.log(read.name().raw(), N::refs(refs.clone()));
         for next in self.next.iter() {
             mods.add(next.clone(), refs.clone());
         }
@@ -28,25 +28,25 @@ impl OnRead for Read {
 }
 #[derive(Debug)]
 struct Send {
-    names: Vec<Name>,
-    next: Option<Molecule>,
+    names: Vec<Name<N>>,
+    next: Option<Molecule<N>>,
 }
 impl Send {
-    fn new(names: &[&Name]) -> Rc<Self> {
+    fn new(names: &[&Name<N>]) -> Rc<Self> {
         Rc::new(Send {
             names: unslice(names),
             next: None,
         })
     }
-    fn new_then(names: &[&Name], next: Molecule) -> Rc<Self> {
+    fn new_then(names: &[&Name<N>], next: Molecule<N>) -> Rc<Self> {
         Rc::new(Send {
             names: unslice(names),
             next: Some(next),
         })
     }
 }
-impl OnSend for Send {
-    fn send(&self, mods: &mut Mods, _send: SendMolecule, refs: Refs) -> Vec<Name> {
+impl OnSend<N> for Send {
+    fn send(&self, mods: &mut Mods<N>, _send: SendMolecule<N>, refs: Refs<N>) -> Vec<Name<N>> {
         let names = refs.get_names(&self.names);
         if let Some(ref next) = self.next {
             mods.add(next.clone(), refs);
@@ -79,13 +79,13 @@ fn terminate_parallel() {
     let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     refs_wx.set(x.clone(), a.clone());
-    expected.log("w", Name::new(refs_wx.clone()));
+    expected.log("w", N::refs(refs_wx.clone()));
     let refs_wxxy = &mut refs_wx.clone();
     refs_wxxy.set(y.clone(), b.clone());
-    expected.log("x", Name::new(refs_wxxy.clone()));
+    expected.log("x", N::refs(refs_wxxy.clone()));
     let refs_wxyz = &mut refs_wx.clone();
     refs_wxyz.set(z.clone(), c.clone());
-    expected.log("y", Name::new(refs_wxyz.clone()));
+    expected.log("y", N::refs(refs_wxyz.clone()));
     pipl.step();
     pipl.step();
     pipl.step();

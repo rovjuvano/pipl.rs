@@ -1,26 +1,26 @@
 use ::Molecule;
 use ::Pipl;
 use ::Refs;
-pub struct Mods {
-    mods: Vec<Mod>,
+pub struct Mods<T> {
+    mods: Vec<Mod<T>>,
 }
-enum Mod {
-    Add(Molecule, Refs),
-    Choice(Vec<Molecule>, Refs),
+enum Mod<T> {
+    Add(Molecule<T>, Refs<T>),
+    Choice(Vec<Molecule<T>>, Refs<T>),
 }
-impl Mods {
-    pub fn new() -> Mods {
+impl<T> Mods<T> {
+    pub fn new() -> Mods<T> {
         Mods {
             mods: Vec::new(),
         }
     }
-    pub fn add<T: Into<Molecule>>(&mut self, molecule: T, refs: Refs) {
+    pub fn add<I: Into<Molecule<T>>>(&mut self, molecule: I, refs: Refs<T>) {
         self.mods.push(Mod::Add(molecule.into(), refs));
     }
-    pub fn choice<T: Into<Molecule>>(&mut self, options: Vec<T>, refs: Refs) {
+    pub fn choice<I: Into<Molecule<T>>>(&mut self, options: Vec<I>, refs: Refs<T>) {
         self.mods.push(Mod::Choice(options.into_iter().map(|x| x.into()).collect(), refs));
     }
-    pub fn apply(self, pipl: &mut Pipl) {
+    pub fn apply(self, pipl: &mut Pipl<T>) {
         for m in self.mods {
             match m {
                 Mod::Add(molecule, refs) => pipl.add_molecule(molecule, refs),

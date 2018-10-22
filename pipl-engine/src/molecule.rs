@@ -4,54 +4,78 @@ use ::OnRead;
 use ::OnSend;
 use ::Refs;
 use std::rc::Rc;
-#[derive(Clone, Debug)]
-pub enum Molecule {
-    Read(ReadMolecule),
-    Send(SendMolecule),
+#[derive(Debug)]
+pub enum Molecule<T> {
+    Read(ReadMolecule<T>),
+    Send(SendMolecule<T>),
 }
-#[derive(Clone, Debug)]
-pub struct ReadMolecule {
-    name: Name,
-    read: Rc<dyn OnRead>,
+impl<T> Clone for Molecule<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Molecule::Read(x) => Molecule::Read(x.clone()),
+            Molecule::Send(x) => Molecule::Send(x.clone()),
+        }
+    }
 }
-impl ReadMolecule {
-    pub fn new(name: Name, read: Rc<dyn OnRead>) -> Self {
+#[derive(Debug)]
+pub struct ReadMolecule<T> {
+    name: Name<T>,
+    read: Rc<dyn OnRead<T>>,
+}
+impl<T> ReadMolecule<T> {
+    pub fn new(name: Name<T>, read: Rc<dyn OnRead<T>>) -> Self {
         ReadMolecule { name, read }
     }
     #[inline]
-    pub fn name(&self) -> &Name {
+    pub fn name(&self) -> &Name<T> {
         &self.name
     }
-    pub fn read(self, mods: &mut Mods, refs: Refs, names: Vec<Name>) {
+    pub fn read(self, mods: &mut Mods<T>, refs: Refs<T>, names: Vec<Name<T>>) {
         let read = self.read.clone();
         read.read(mods, self, refs, names);
     }
 }
-#[derive(Clone, Debug)]
-pub struct SendMolecule {
-    name: Name,
-    send: Rc<dyn OnSend>,
+impl<T> Clone for ReadMolecule<T> {
+    fn clone(&self) -> Self {
+        ReadMolecule {
+            name: self.name.clone(),
+            read: self.read.clone(),
+        }
+    }
 }
-impl SendMolecule {
-    pub fn new(name: Name, send: Rc<dyn OnSend>) -> Self {
+#[derive(Debug)]
+pub struct SendMolecule<T> {
+    name: Name<T>,
+    send: Rc<dyn OnSend<T>>,
+}
+impl<T> SendMolecule<T> {
+    pub fn new(name: Name<T>, send: Rc<dyn OnSend<T>>) -> Self {
         SendMolecule { name, send }
     }
     #[inline]
-    pub fn name(&self) -> &Name {
+    pub fn name(&self) -> &Name<T> {
         &self.name
     }
-    pub fn send(self, mods: &mut Mods, refs: Refs) -> Vec<Name> {
+    pub fn send(self, mods: &mut Mods<T>, refs: Refs<T>) -> Vec<Name<T>> {
         let send = self.send.clone();
         send.send(mods, self, refs)
     }
 }
-impl From<ReadMolecule> for Molecule {
-    fn from(read: ReadMolecule) -> Self {
+impl<T> Clone for SendMolecule<T> {
+    fn clone(&self) -> Self {
+        SendMolecule {
+            name: self.name.clone(),
+            send: self.send.clone(),
+        }
+    }
+}
+impl<T> From<ReadMolecule<T>> for Molecule<T> {
+    fn from(read: ReadMolecule<T>) -> Self {
         Molecule::Read(read)
     }
 }
-impl From<SendMolecule> for Molecule {
-    fn from(send: SendMolecule) -> Self {
+impl<T> From<SendMolecule<T>> for Molecule<T> {
+    fn from(send: SendMolecule<T>) -> Self {
         Molecule::Send(send)
     }
 }

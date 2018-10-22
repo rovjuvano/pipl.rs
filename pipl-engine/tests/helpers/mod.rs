@@ -1,24 +1,44 @@
 #![allow(dead_code)]
 pub use pipl_engine::{Mods, Molecule, Name, OnRead, OnSend, Pipl, ReadMolecule, Refs, SendMolecule};
 use std::cell::RefCell;
-use std::fmt;
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::collections::HashSet;
 pub use std::rc::Rc;
 #[derive(Debug, Eq, PartialEq)]
-pub struct Results(RefCell<HashMap<String, Vec<Name>>>);
+pub enum N {
+    Str(&'static str),
+    Refs(Refs<N>),
+    Vec(Vec<Name<N>>),
+}
+impl N {
+    pub fn str(v: &'static str) -> Name<N> { Name::new(N::Str(v)) }
+    pub fn refs(v: Refs<N>) -> Name<N> { Name::new(N::Refs(v)) }
+    pub fn vec(v: Vec<Name<N>>) -> Name<N> { Name::new(N::Vec(v)) }
+}
+pub fn n(v: &'static str) -> Name<N> { N::str(v) }
+impl<'a> From<&'a N> for String {
+    fn from(name: &'a N) -> String {
+        match name {
+            N::Str(x) => String::from(*x),
+            N::Refs(x) => format!("{:?}", x),
+            N::Vec(x) => format!("{}", x.iter().map(|x| String::from(x.raw()) ).collect::<String>(),)
+        }
+    }
+}
+#[derive(Debug, Eq, PartialEq)]
+pub struct Results(RefCell<HashMap<String, Vec<Name<N>>>>);
 impl Results {
     pub fn new() -> Rc<Self> {
         Rc::new(Results(RefCell::new(HashMap::new())))
     }
-    pub fn log<K: Into<String>>(&self, key: K, value: Name) {
+    pub fn log<K: Into<String>>(&self, key: K, value: Name<N>) {
         self.0.borrow_mut()
             .entry(key.into())
             .or_insert(Vec::new())
             .push(value);
     }
-    pub fn get(&self, key: &str) -> Vec<Name> {
+    pub fn get(&self, key: &str) -> Vec<Name<N>> {
         self.0.borrow()
             .get(key)
             .or(Some(&Vec::with_capacity(0)))
@@ -28,13 +48,10 @@ impl Results {
 pub fn unslice<T: Clone>(slice: &[&T]) -> Vec<T> {
     slice.iter().map(|&x| x.clone()).collect()
 }
-pub fn n<T: fmt::Debug +'static>(name: T) -> Name {
-    Name::new(name)
-}
-pub fn read(name: &Name, read: Rc<OnRead>) -> Molecule {
+pub fn read(name: &Name<N>, read: Rc<OnRead<N>>) -> Molecule<N> {
     Molecule::from(ReadMolecule::new(name.clone(), read))
 }
-pub fn send(name: &Name, send: Rc<OnSend>) -> Molecule {
+pub fn send(name: &Name<N>, send: Rc<OnSend<N>>) -> Molecule<N> {
     Molecule::from(SendMolecule::new(name.clone(), send))
 }
 fn diff<'a, T: Eq + Hash>(left: &'a HashSet<T>, right: &'a HashSet<T>) -> (HashSet<&'a T>, HashSet<&'a T>) {
@@ -51,22 +68,13 @@ pub fn assert_eq_results(left: &Rc<Results>, right: &Rc<Results>) {
         assert_eq_lists(left.get(key), right.get(key), key);
     }
 }
-fn assert_eq_lists(left: Vec<Name>, right: Vec<Name>, key: &str) {
+fn assert_eq_lists(left: Vec<Name<N>>, right: Vec<Name<N>>, key: &str) {
     for (i,(l, r)) in left.iter().zip(right.iter()).enumerate() {
-        let message = &format!("results[{:?}][{:?}]", key, i);
-        if l.raw().is::<Refs>() {
-            assert_eq_refs(l.raw().downcast_ref::<Refs>().unwrap(), r.raw().downcast_ref::<Refs>().unwrap(), message);
-        }
-        else if l.raw().is::<Vec<Name>>() {
-            assert_eq!(l.raw().downcast_ref::<Vec<Name>>(), r.raw().downcast_ref::<Vec<Name>>(), "{}::<Vec<Name>>", message);
-        }
-        else {
-            assert!(false, "unrecognized type for NameValue: {:?}", l);
-        }
+        assert_eq!(l.raw(), r.raw(), "results[{:?}][{:?}]", key, i);
     }
     assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
 }
-fn assert_eq_refs(left: &Refs, right: &Refs, message: &str) {
+fn assert_eq_refs(left: &Refs<N>, right: &Refs<N>, message: &str) {
     let keys_left = left.keys();
     let keys_right = right.keys();
     let keys_left = keys_left.iter().collect::<HashSet<_>>();
@@ -76,24 +84,6 @@ fn assert_eq_refs(left: &Refs, right: &Refs, message: &str) {
     for k in keys_left.iter() {
         let left_name = &left.get(k);
         let right_name = &right.get(k);
-        let message = &format!("{}[{:?}]", message, k);
-        if left_name.raw().is::<&str>() {
-            assert_eq_name_values::<&str>(left_name, right_name, message);
-        }
-        else if left_name.raw().is::<char>() {
-            assert_eq_name_values::<char>(left_name, right_name, message);
-        }
-        else {
-            assert!(false, "unrecognized type for NameValue: {:?}", left_name);
-        }
+        assert_eq!(left_name.raw(), right_name.raw(), "{}[{:?}]", message, k);
     }
-}
-fn assert_eq_name_values<T: fmt::Debug + Eq + PartialEq + 'static>(left: &Name, right: &Name, message: &String) {
-    assert_ne!(None, left.raw().downcast_ref::<T>());
-    assert_eq!(
-        left.raw().downcast_ref::<T>(),
-        right.raw().downcast_ref::<T>(),
-        "{}",
-        message
-    );
 }

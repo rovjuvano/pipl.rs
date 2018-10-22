@@ -3,17 +3,17 @@ use helpers::*;
 struct Read {
     results: Rc<Results>,
 }
-impl OnRead for Read {
-    fn read(&self, _mods: &mut Mods, _read: ReadMolecule, _refs: Refs, names: Vec<Name>) {
-        self.results.log("read", Name::new(names));
+impl OnRead<N> for Read {
+    fn read(&self, _mods: &mut Mods<N>, _read: ReadMolecule<N>, _refs: Refs<N>, names: Vec<Name<N>>) {
+        self.results.log("read", N::vec(names));
     }
 }
 #[derive(Debug)]
 struct Send {
-    names: Vec<Name>,
+    names: Vec<Name<N>>,
 }
-impl OnSend for Send {
-    fn send(&self, _mods: &mut Mods, _send: SendMolecule, _refs: Refs) -> Vec<Name> {
+impl OnSend<N> for Send {
+    fn send(&self, _mods: &mut Mods<N>, _send: SendMolecule<N>, _refs: Refs<N>) -> Vec<Name<N>> {
         self.names.clone()
     }
 }
@@ -29,6 +29,6 @@ fn simplest_reaction() {
     pipl.add(wa);
     pipl.step();
     let expected = &Results::new();
-    expected.log("read", Name::new(vec![a.clone()]));
+    expected.log("read", N::vec(vec![a.clone()]));
     assert_eq_results(actual, expected);
 }
