@@ -11,12 +11,22 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl<T> {
     map: ReactionMap<T>,
+    names: Vec<T>,
 }
 impl<T> Pipl<T> {
     pub fn new() -> Self {
         Pipl {
             map: ReactionMap::new(),
+            names: Vec::new(),
         }
+    }
+    pub fn new_name(&mut self, data: T) -> Name {
+        let name = Name::new(self.names.len());
+        self.names.push(data);
+        name
+    }
+    pub fn get_value(&self, name: &Name) -> Option<&T> {
+        self.names.get(name.0)
     }
     pub fn add(&mut self, molecule: Molecule<T>) {
         self.add_molecule(molecule, Refs::new());
@@ -27,29 +37,29 @@ impl<T> Pipl<T> {
     pub fn send(&mut self, send: SendMolecule<T>) {
         self.add_send(send, Refs::new());
     }
-    fn add_molecule(&mut self, molecule: Molecule<T>, refs: Refs<T>) {
+    fn add_molecule(&mut self, molecule: Molecule<T>, refs: Refs) {
         match molecule {
             Molecule::Read(read) => self.add_read(read, refs),
             Molecule::Send(send) => self.add_send(send, refs),
         }
     }
-    fn add_read(&mut self, read: ReadMolecule<T>, refs: Refs<T>) {
+    fn add_read(&mut self, read: ReadMolecule<T>, refs: Refs) {
         self.map.add_read(ReadReaction::new(read, refs));
     }
-    fn add_send(&mut self, send: SendMolecule<T>, refs: Refs<T>) {
+    fn add_send(&mut self, send: SendMolecule<T>, refs: Refs) {
         self.map.add_send(SendReaction::new(send, refs));
     }
-    fn add_choice(&mut self, molecules: Vec<Molecule<T>>, refs: Refs<T>) {
+    fn add_choice(&mut self, molecules: Vec<Molecule<T>>, refs: Refs) {
         self.map.add_choice(ChoiceReaction::new(molecules, refs));
     }
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
             let ReadReaction { read, refs: read_refs } = reader;
             let SendReaction { send, refs: send_refs } = sender;
-            let mut mods = Mods::new();
+            let mut mods = Mods::new(self);
             let names = send.send(&mut mods, send_refs);
             read.read(&mut mods, read_refs, names);
-            mods.apply(self);
+            mods.apply();
         }
     }
 }
@@ -62,33 +72,33 @@ enum Reaction<T> {
 #[derive(Debug)]
 struct ReadReaction<T> {
     read: ReadMolecule<T>,
-    refs: Refs<T>,
+    refs: Refs,
 }
 impl<T> ReadReaction<T> {
-    fn new(read: ReadMolecule<T>, refs: Refs<T>) -> Self {
+    fn new(read: ReadMolecule<T>, refs: Refs) -> Self {
         ReadReaction { read, refs }
     }
 }
 #[derive(Debug)]
 struct SendReaction<T> {
     send: SendMolecule<T>,
-    refs: Refs<T>,
+    refs: Refs,
 }
 impl<T> SendReaction<T> {
-    fn new(send: SendMolecule<T>, refs: Refs<T>) -> Self {
+    fn new(send: SendMolecule<T>, refs: Refs) -> Self {
         SendReaction { send, refs }
     }
 }
 #[derive(Debug)]
 struct ChoiceReaction<T> {
     molecules: Vec<Molecule<T>>,
-    refs: Refs<T>,
+    refs: Refs,
 }
 impl<T> ChoiceReaction<T> {
-    fn new(molecules: Vec<Molecule<T>>, refs: Refs<T>) -> Self {
+    fn new(molecules: Vec<Molecule<T>>, refs: Refs) -> Self {
         ChoiceReaction { molecules, refs }
     }
-    fn collapse(self, name: &Name<T>, is_read: bool) -> (Molecule<T>, Refs<T>) {
+    fn collapse(self, name: &Name, is_read: bool) -> (Molecule<T>, Refs) {
         let ChoiceReaction { mut molecules, refs } = self;
         let molecule = molecules.drain(..)
             .filter(|x| {
@@ -101,14 +111,14 @@ impl<T> ChoiceReaction<T> {
             .unwrap();
         (molecule, refs)
     }
-    fn collapse_read(self, name: &Name<T>) -> ReadReaction<T> {
+    fn collapse_read(self, name: &Name) -> ReadReaction<T> {
         let (molecule, refs) = self.collapse(name, true);
         match molecule {
             Molecule::Read(read) => ReadReaction::new(read, refs),
             Molecule::Send(_) => unreachable!(),
         }
     }
-    fn collapse_send(self, name: &Name<T>) -> SendReaction<T> {
+    fn collapse_send(self, name: &Name) -> SendReaction<T> {
         let (molecule, refs) = self.collapse(name, false);
         match molecule {
             Molecule::Read(_) => unreachable!(),
@@ -118,9 +128,9 @@ impl<T> ChoiceReaction<T> {
 }
 #[derive(Debug)]
 struct ReactionMap<T> {
-    reads: HashMap<Name<T>, Vec<Reaction<T>>>,
-    sends: HashMap<Name<T>, Vec<Reaction<T>>>,
-    pairs: HashMap<Name<T>, (Vec<Reaction<T>>, Vec<Reaction<T>>)>,
+    reads: HashMap<Name, Vec<Reaction<T>>>,
+    sends: HashMap<Name, Vec<Reaction<T>>>,
+    pairs: HashMap<Name, (Vec<Reaction<T>>, Vec<Reaction<T>>)>,
 }
 impl<T> ReactionMap<T> {
     fn new() -> Self {
@@ -140,7 +150,7 @@ impl<T> ReactionMap<T> {
             }
         }
     }
-    fn add_reaction(&mut self, name: Name<T>, reaction: Reaction<T>, is_read: bool) {
+    fn add_reaction(&mut self, name: Name, reaction: Reaction<T>, is_read: bool) {
         if let Some(&mut (ref mut reads, ref mut sends)) = self.pairs.get_mut(&name) {
             select(is_read, reads, sends).push(reaction);
             return;
@@ -164,14 +174,14 @@ impl<T> ReactionMap<T> {
         let reaction = Reaction::Send(send);
         self.add_reaction(name, reaction, false);
     }
-    fn collapse_read(&mut self, reaction: Reaction<T>, name: &Name<T>) -> ReadReaction<T> {
+    fn collapse_read(&mut self, reaction: Reaction<T>, name: &Name) -> ReadReaction<T> {
         match reaction {
             Reaction::Choice(choice) => self.unwrap_choice(choice).collapse_read(name),
             Reaction::Read(read) => read,
             _ => unreachable!(),
         }
     }
-    fn collapse_send(&mut self, reaction: Reaction<T>, name: &Name<T>) -> SendReaction<T> {
+    fn collapse_send(&mut self, reaction: Reaction<T>, name: &Name) -> SendReaction<T> {
         match reaction {
             Reaction::Choice(choice) => self.unwrap_choice(choice).collapse_send(name),
             Reaction::Send(send) => send,
@@ -186,7 +196,7 @@ impl<T> ReactionMap<T> {
             }
         })
     }
-    fn remove_choice(&mut self, name: &Name<T>, choice: &Rc<ChoiceReaction<T>>, is_read: bool) {
+    fn remove_choice(&mut self, name: &Name, choice: &Rc<ChoiceReaction<T>>, is_read: bool) {
         if let Some((mut reads, mut sends)) = self.pairs.remove(&name) {
             Self::remove_option(select(is_read, &mut reads, &mut sends), choice);
             if select(is_read, &mut reads, &mut sends).is_empty() {
