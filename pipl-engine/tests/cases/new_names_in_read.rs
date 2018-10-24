@@ -2,9 +2,8 @@ use helpers::*;
 #[test]
 fn new_names_in_read() {
     // w[x].y(w).a(b).x(c).() w(a).[w, x]y[m].a[n].x[o].()
-    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
-    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
-    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y a b c m n o });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -17,7 +16,6 @@ fn new_names_in_read() {
         .read(y).names(&[m]).call(log("y[m]", actual)).restrict(&[w, x])
         .read(a).names(&[n]).call(log("a[n]", actual))
         .read(x).names(&[o]).call(log("x[o]", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
@@ -26,8 +24,8 @@ fn new_names_in_read() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    refs_wa.set(w.clone(), w.dup());
-    refs_wa.set(x.clone(), x.dup());
+    refs_wa.set(w.clone(), pipl.dup_name(w));
+    refs_wa.set(x.clone(), pipl.dup_name(x));
     refs_wa.set(m.clone(), w.clone());
     expected.log("y[m]", refs_wa.clone());
     expected.log("y(w)", refs_wx.clone());
@@ -37,7 +35,7 @@ fn new_names_in_read() {
     expected.log("a(b)", refs_wx.clone());
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
     assert_ne_names(&actual.get(&"y[m]").get(0).unwrap().get(w), w);
     assert_eq!(&actual.get(&"y[m]").get(0).unwrap().get(m), w);
 }

@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn terminate_choice() {
     // w[x].(+ x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
-    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
-    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y z a b c d });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     {
@@ -19,7 +19,6 @@ fn terminate_choice() {
         .send(a).names(&[b]).call(log("a(b)", actual))
         .send(y).names(&[c]).call(log("y(c)", actual));
     builder.send(b).names(&[d]).call(log("b(d)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
@@ -35,5 +34,5 @@ fn terminate_choice() {
     pipl.step();
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

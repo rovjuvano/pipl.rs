@@ -4,9 +4,8 @@ fn new_names_in_choice_prefixes() {
     // w[x].(+ [m]w[y].y(m).m(b).() )
     // w(a).(+ [n]w(n).n[o].o[p].() )
     // m[z].() n(c).() o(d).()
-    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
-    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
-    let (m, n, o, p) = (&n("m"), &n("n"), &n("o"), &n("p"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y z a b c d m n o p });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     {
@@ -33,7 +32,6 @@ fn new_names_in_choice_prefixes() {
         .send(n).names(&[c]).call(log("n(c)", actual));
     builder
         .send(o).names(&[d]).call(log("o(d)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
@@ -42,8 +40,8 @@ fn new_names_in_choice_prefixes() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    let m2 = m.dup();
-    let n2 = n.dup();
+    let m2 = pipl.dup_name(m);
+    let n2 = pipl.dup_name(n);
     refs_wx.set(m.clone(), m2.clone());
     refs_wx.set(y.clone(), n2.clone());
     refs_wa.set(n.clone(), n2.clone());
@@ -58,5 +56,5 @@ fn new_names_in_choice_prefixes() {
     expected.log("o[p]", refs_wa.clone());
     expected.log("m(b)", refs_wx.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

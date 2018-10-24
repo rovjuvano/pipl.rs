@@ -1,43 +1,34 @@
 use ::name::Name;
 use std::collections::HashMap;
 #[derive(Debug, Eq, PartialEq)]
-pub struct Refs<T> {
-    refs: HashMap<Name<T>, Name<T>>,
+pub struct Refs {
+    refs: HashMap<Name, Name>,
 }
-impl<T> Refs<T> {
+impl Refs {
     pub fn new() -> Self {
         Refs { refs: HashMap::new() }
     }
-    pub fn get(&self, key: &Name<T>) -> Name<T> {
+    pub fn get(&self, key: &Name) -> Name {
         self.refs.get(key).unwrap_or(key).clone()
     }
-    pub fn get_names(&self, keys: &[Name<T>]) -> Vec<Name<T>> {
+    pub fn get_names(&self, keys: &[Name]) -> Vec<Name> {
         keys.iter().map(|k| {
             self.get(k)
         }).collect()
     }
-    pub fn keys(&self) -> Vec<&Name<T>> {
+    pub fn keys(&self) -> Vec<&Name> {
         self.refs.keys().collect()
     }
-    pub fn new_name(&mut self, key: Name<T>) {
-        let value = key.dup();
-        self.set(key.clone(), value.clone());
-    }
-    pub fn new_names(&mut self, keys: Vec<Name<T>>) {
-        for k in keys.into_iter() {
-            self.new_name(k);
-        }
-    }
-    pub fn set(&mut self, key: Name<T>, value: Name<T>) {
+    pub fn set(&mut self, key: Name, value: Name) {
         self.refs.insert(key, value);
     }
-    pub fn set_names(&mut self, keys: Vec<Name<T>>, values: Vec<Name<T>>) {
+    pub fn set_names(&mut self, keys: Vec<Name>, values: Vec<Name>) {
         for (k, v) in keys.into_iter().zip(values) {
             self.set(k, v);
         }
     }
 }
-impl<T> Clone for Refs<T> {
+impl Clone for Refs {
     fn clone(&self) -> Self {
         Refs { refs: self.refs.clone() }
     }
@@ -46,8 +37,8 @@ impl<T> Clone for Refs<T> {
 mod tests {
     use super::Name;
     use super::Refs;
-    fn n<T>(name: T) -> Name<T> {
-        Name::new(name)
+    fn n(name: usize) -> Name {
+        Name::new(name, 0)
     }
     #[test]
     fn get_default() {
@@ -73,24 +64,6 @@ mod tests {
         let actual = subject.get_names(&vec![k1, k2.clone(), k3]);
         let expected = vec![v1, k2, v3];
         assert_eq!(actual, expected);
-    }
-    #[test]
-    fn new_name() {
-        let mut subject = Refs::new();
-        let (k,) = (n(1),);
-        subject.new_name(k.clone());
-        assert_ne!(subject.get(&k), k);
-        subject.new_name(k.clone());
-        assert_ne!(subject.get(&k), k);
-    }
-    #[test]
-    fn new_names() {
-        let mut subject = Refs::new();
-        let (k1, k2, k3) = (n(1), n(2), n(3));
-        subject.new_names(vec![k1.clone(), k2.clone(), k3.clone()]);
-        assert_ne!(subject.get(&k1), k1);
-        assert_ne!(subject.get(&k2), k2);
-        assert_ne!(subject.get(&k3), k3);
     }
     #[test]
     fn set() {

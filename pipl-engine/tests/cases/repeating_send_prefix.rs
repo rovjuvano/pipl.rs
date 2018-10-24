@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn repeating_send_prefix() {
     // w[a].a[c].w[b].b[c].a[d].b[e].() !w(x).!x(y).()
-    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
-    let (a, b, c, d, e) = (&n("a"), &n("b"), &n("c"), &n("d"), &n("e"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y a b c d e });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -16,7 +16,6 @@ fn repeating_send_prefix() {
     builder
         .send(w).names(&[x]).repeat().call(log("!w(x)", actual))
         .send(x).names(&[y]).repeat().call(log("!x(y)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
@@ -48,5 +47,5 @@ fn repeating_send_prefix() {
     expected.log("!x(y)", refs_empty.clone());
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

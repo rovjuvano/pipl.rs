@@ -2,7 +2,11 @@ use helpers::*;
 #[test]
 fn mixed_name_value_types() {
     // w(x).x[y].() w[z].z(z).()
-    let (w, x, y, z) = (&n("w"), &N::char('x'), &N::i32(121), &N::vec_str(vec!["z"]));
+    let mut pipl = Pipl::new();
+    let w = &pipl.new_name(N::String("w".to_owned()));
+    let x = &pipl.new_name(N::Char('x'));
+    let y = &pipl.new_name(N::I32(121));
+    let z = &pipl.new_name(N::VecStr(vec!["z"]));
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -11,7 +15,6 @@ fn mixed_name_value_types() {
     builder
         .read(w).names(&[z]).call(log("w[z]", actual))
         .send(z).names(&[z]).call(log("z(z)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
@@ -20,10 +23,10 @@ fn mixed_name_value_types() {
     expected.log("w(x)", refs_wx.clone());
     expected.log("w[z]", refs_wz.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
     refs_wx.set(y.clone(), x.clone());
     expected.log("x[y]", refs_wx.clone());
     expected.log("z(z)", refs_wz.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

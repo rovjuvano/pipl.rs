@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn no_names() {
     // w[].x().() w(a).x[b].()
-    let (w, x) = (&n("w"), &n("x"));
-    let (a, b) = (&n("a"), &n("b"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x a b });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -12,7 +12,6 @@ fn no_names() {
     builder
         .send(w).names(&[a]).call(log("w(a)", actual))
         .read(x).names(&[b]).call(log("x[b]", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
@@ -22,5 +21,5 @@ fn no_names() {
     expected.log("x[b]", refs_empty.clone());
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

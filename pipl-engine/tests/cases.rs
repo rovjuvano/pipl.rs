@@ -1,4 +1,5 @@
 extern crate pipl_engine;
+#[macro_use]
 mod helpers;
 mod cases {
     mod simplest_reaction;

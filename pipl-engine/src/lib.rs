@@ -5,6 +5,7 @@ pub use self::builder::{ChoiceBuilder, ParallelBuilder, PiplBuilder, PrefixBuild
 
 mod call;
 pub use self::call::Call;
+pub use self::call::CallFrame;
 
 mod channel;
 

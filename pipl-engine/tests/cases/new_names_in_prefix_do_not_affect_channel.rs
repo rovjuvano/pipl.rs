@@ -3,9 +3,8 @@ use helpers::*;
 fn new_names_in_prefix_do_not_affect_channel() {
     // [w]w[m].(+ [x]x[n].(| [y]y[o].() ) )
     // [w]w(a).(+ [x]x(b).(| [y]y(c).() ) )
-    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
-    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
-    let (m, n, o) = (&n("m"), &n("n"), &n("o"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y a b c m n o });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     {
@@ -28,30 +27,29 @@ fn new_names_in_prefix_do_not_affect_channel() {
         parallel
             .send(y).names(&[c]).restrict(&[y]).call(log("[y]y(c)", actual));
     }
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wm = &mut Refs::new();
     let refs_wa = &mut Refs::new();
-    refs_wm.set(w.clone(), w.dup());
+    refs_wm.set(w.clone(), pipl.dup_name(w));
     refs_wm.set(m.clone(), a.clone());
-    refs_wa.set(w.clone(), w.dup());
+    refs_wa.set(w.clone(), pipl.dup_name(w));
     expected.log("[w]w[m]", refs_wm.clone());
     expected.log("[w]w(a)", refs_wa.clone());
     pipl.step();
-    refs_wm.set(x.clone(), x.dup());
+    refs_wm.set(x.clone(), pipl.dup_name(x));
     refs_wm.set(n.clone(), b.clone());
-    refs_wa.set(x.clone(), x.dup());
+    refs_wa.set(x.clone(), pipl.dup_name(x));
     expected.log("[x]x[n]", refs_wm.clone());
     expected.log("[x]x(b)", refs_wa.clone());
     pipl.step();
-    refs_wm.set(y.clone(), y.dup());
+    refs_wm.set(y.clone(), pipl.dup_name(y));
     refs_wm.set(o.clone(), c.clone());
-    refs_wa.set(y.clone(), y.dup());
+    refs_wa.set(y.clone(), pipl.dup_name(y));
     expected.log("[y]y[o]", refs_wm.clone());
     expected.log("[y]y(c)", refs_wa.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
     let refs_yo = actual.get(&"[y]y[o]").get(0).unwrap().clone();
     let refs_yc = actual.get(&"[y]y(c)").get(0).unwrap().clone();
     assert_ne_names(&refs_yo.get(w), w);

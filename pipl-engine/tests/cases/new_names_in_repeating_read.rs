@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn new_names_in_repeating_read() {
     // w[x].w[y].y(b).x(c).() ![a]z[].w(a).a[x].() !a(d).() z().z().()
-    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
-    let (a, b, c, d) = (&n("a"), &n("b"), &n("c"), &n("d"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y z a b c d });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -20,26 +20,25 @@ fn new_names_in_repeating_read() {
     builder
         .send(z).call(log("z()", actual))
         .send(z).call(log("z()", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
     let refs_wx = &mut Refs::new();
     let refs_wax = &mut Refs::new();
     let refs_way = &mut Refs::new();
-    refs_wax.set(a.clone(), a.dup());
-    refs_way.set(a.clone(), a.dup());
+    refs_wax.set(a.clone(), pipl.dup_name(a));
+    refs_way.set(a.clone(), pipl.dup_name(a));
     expected.log("![a]z[]", refs_wax.clone());
     expected.log("![a]z[]", refs_way.clone());
     expected.log("z()", refs_empty.clone());
     expected.log("z()", refs_empty.clone());
     pipl.step();
     pipl.step();
-    refs_wx.set(x.clone(), a.dup());
+    refs_wx.set(x.clone(), pipl.dup_name(a));
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wax.clone());
     pipl.step();
-    refs_wx.set(y.clone(), a.dup());
+    refs_wx.set(y.clone(), pipl.dup_name(a));
     expected.log("w[y]", refs_wx.clone());
     expected.log("w(a)", refs_way.clone());
     pipl.step();
@@ -51,5 +50,5 @@ fn new_names_in_repeating_read() {
     expected.log("x(c)", refs_wx.clone());
     expected.log("a[x]", refs_wax.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

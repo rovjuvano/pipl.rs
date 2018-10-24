@@ -3,6 +3,7 @@ use self::mods::Mods;
 
 use ::channel::Channel;
 use ::name::Name;
+use ::name::NameStore;
 use ::prefix::Prefix;
 use ::reaction::Reaction;
 use ::reaction::sequence::SequenceReaction;
@@ -12,34 +13,42 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl<T> {
     map: ReactionMap<T>,
+    names: NameStore<T>,
 }
 impl<T> Pipl<T> {
     pub fn new() -> Self {
         Pipl {
             map: ReactionMap::new(),
+            names: NameStore::new(),
         }
     }
     pub fn add(&mut self, prefix: Prefix<T>) {
         let channel = prefix.channel().clone();
         let reaction = Reaction::new_sequence(Refs::new(), Rc::new(prefix));
-        self.add_reaction(&channel, Rc::new(reaction));
+        self.map.add(&channel, Rc::new(reaction));
+    }
+    pub fn dup_name(&mut self, name: &Name) -> Name {
+        self.names.dup_name(name)
+    }
+    pub fn get_value(&self, name: &Name) -> Option<&T> {
+        self.names.get_value(name)
+    }
+    pub fn new_name(&mut self, data: T) -> Name {
+        self.names.new_name(data)
     }
     pub fn step(&mut self) {
         if let Some((reader, sender)) = self.map.next() {
-            let mut mods = Mods::new();
+            let mut mods = Mods::new(&mut self.names);
             let output = sender.send(&mut mods);
             reader.read(&mut mods, output);
-            mods.apply(self);
+            mods.apply(&mut self.map);
         }
-    }
-    fn add_reaction(&mut self, channel: &Channel<T>, reaction: Rc<Reaction<T>>) {
-        self.map.add(channel, reaction);
     }
 }
 #[derive(Debug)]
-struct ReactionMap<T> {
-    map: HashMap<Channel<T>, ReactionQueue<T>>,
-    queue: ReadyQueue<T>,
+pub(self) struct ReactionMap<T> {
+    map: HashMap<Channel, ReactionQueue<T>>,
+    queue: ReadyQueue,
 }
 impl<T> ReactionMap<T> {
     fn new() -> Self {
@@ -48,7 +57,7 @@ impl<T> ReactionMap<T> {
             queue: ReadyQueue::new(),
         }
     }
-    fn add(&mut self, channel: &Channel<T>, reaction: Rc<Reaction<T>>) {
+    fn add(&mut self, channel: &Channel, reaction: Rc<Reaction<T>>) {
         self.map.entry(channel.clone())
             .or_insert(ReactionQueue::new())
             .add(reaction);
@@ -58,7 +67,7 @@ impl<T> ReactionMap<T> {
             }
         }
     }
-    fn collapse(&mut self, channel: &Channel<T>) -> SequenceReaction<T> {
+    fn collapse(&mut self, channel: &Channel) -> SequenceReaction<T> {
         let reaction = self.map.get_mut(channel).unwrap().next();
         if Rc::strong_count(&reaction) > 1 {
             for c in reaction.channels() {
@@ -83,12 +92,12 @@ impl<T> ReactionMap<T> {
             None
         }
     }
-    fn remove(&mut self, channel: &Channel<T>, refs: &Refs<T>) {
+    fn remove(&mut self, channel: &Channel, refs: &Refs) {
         if let Some(queue) = self.map.get_mut(channel) {
             queue.remove(refs);
         }
     }
-    fn still_ready(&self, read: &Channel<T>, send: &Channel<T>) -> bool {
+    fn still_ready(&self, read: &Channel, send: &Channel) -> bool {
         match (self.map.get(read), self.map.get(send)) {
             (Some(read_q), Some(send_q)) => read_q.is_ready() && send_q.is_ready(),
             _ => false,
@@ -110,7 +119,7 @@ impl<T> ReactionQueue<T> {
     fn next(&mut self) -> Rc<Reaction<T>> {
         self.0.remove(0)
     }
-    fn remove(&mut self, refs: &Refs<T>) {
+    fn remove(&mut self, refs: &Refs) {
         if let Some(i) = self.0.iter().position(|x| {
             ::std::ptr::eq(x.refs(), refs)
         }) {
@@ -119,15 +128,15 @@ impl<T> ReactionQueue<T> {
     }
 }
 #[derive(Debug)]
-struct ReadyQueue<T>(Vec<Name<T>>);
-impl<T> ReadyQueue<T> {
+struct ReadyQueue(Vec<Name>);
+impl ReadyQueue {
     fn new() -> Self {
         ReadyQueue(Vec::new())
     }
-    fn add(&mut self, name: Name<T>) {
+    fn add(&mut self, name: Name) {
         self.0.push(name);
     }
-    fn next(&mut self) -> Option<Name<T>> {
+    fn next(&mut self) -> Option<Name> {
         if self.0.len() > 0 {
             Some(self.0.remove(0))
         } else {

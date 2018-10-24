@@ -1,4 +1,5 @@
 use ::channel::Channel;
+use ::call::CallFrame;
 use ::name::Name;
 use ::pipl::mods::Mods;
 use ::prefix::Action;
@@ -7,25 +8,25 @@ use ::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct SequenceReaction<T> {
-    refs: Refs<T>,
+    refs: Refs,
     prefix: Rc<Prefix<T>>,
 }
 impl<T> SequenceReaction<T> {
-    pub fn new(refs: Refs<T>, prefix: Rc<Prefix<T>>) -> Self {
+    pub fn new(refs: Refs, prefix: Rc<Prefix<T>>) -> Self {
         SequenceReaction { refs: refs, prefix: prefix }
     }
-    pub fn channels(&self) -> Vec<&Channel<T>> {
+    pub fn channels(&self) -> Vec<&Channel> {
         vec![self.prefix.channel()]
     }
-    pub fn read(self, mods: &mut Mods<T>, names: Vec<Name<T>>) {
+    pub fn read(self, mods: &mut Mods<T>, names: Vec<Name>) {
         let SequenceReaction { refs, prefix } = self;
         Self::react(mods, refs, prefix, Some(names));
     }
-    pub fn send(self, mods: &mut Mods<T>) -> Vec<Name<T>> {
+    pub fn send(self, mods: &mut Mods<T>) -> Vec<Name> {
         let SequenceReaction { refs, prefix } = self;
         Self::react(mods, refs, prefix, None).unwrap_or_else(|| Vec::new())
     }
-    fn react(mods: &mut Mods<T>, mut refs: Refs<T>, prefix: Rc<Prefix<T>>, read_names: Option<Vec<Name<T>>>) -> Option<Vec<Name<T>>> {
+    fn react(mods: &mut Mods<T>, mut refs: Refs, prefix: Rc<Prefix<T>>, read_names: Option<Vec<Name>>) -> Option<Vec<Name>> {
         let mut send_names = None;
         let mut iter = prefix.actions().iter();
         let mut action = iter.next();
@@ -34,7 +35,7 @@ impl<T> SequenceReaction<T> {
             action = iter.next();
         }
         if let Some(&Action::Restrict(ref names)) = action {
-            refs.new_names(names.clone());
+            mods.new_names(&mut refs, names);
             action = iter.next();
         }
         if let Some(&Action::Communicate(ref names)) = action {
@@ -45,7 +46,7 @@ impl<T> SequenceReaction<T> {
             action = iter.next();
         }
         if let Some(&Action::Call(ref call)) = action {
-            refs = call.call(refs);
+            call.call(CallFrame::new(&mut refs, mods));
             action = iter.next();
         }
         if let Some(&Action::Prefix(ref prefix)) = action {
@@ -53,7 +54,7 @@ impl<T> SequenceReaction<T> {
         }
         else {
             if let Some(&Action::Restrict(ref names)) = action {
-                refs.new_names(names.clone());
+                mods.new_names(&mut refs, names);
                 action = iter.next();
             }
             if let Some(&Action::Parallel(ref sequences)) = action {
@@ -66,7 +67,7 @@ impl<T> SequenceReaction<T> {
         send_names
     }
     #[inline]
-    pub fn refs(&self) -> &Refs<T> {
+    pub fn refs(&self) -> &Refs {
         &self.refs
     }
 }

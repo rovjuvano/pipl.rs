@@ -2,7 +2,8 @@ use helpers::*;
 #[test]
 fn simplest_mobility() {
     // w(x).x[y].() w[z].z(z).()
-    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y z });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -11,7 +12,6 @@ fn simplest_mobility() {
     builder
         .read(w).names(&[z]).call(log("w[z]", actual))
         .send(z).names(&[z]).call(log("z(z)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
@@ -20,10 +20,10 @@ fn simplest_mobility() {
     expected.log("w(x)", refs_wx.clone());
     expected.log("w[z]", refs_wz.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
     refs_wx.set(y.clone(), x.clone());
     expected.log("x[y]", refs_wx.clone());
     expected.log("z(z)", refs_wz.clone());
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

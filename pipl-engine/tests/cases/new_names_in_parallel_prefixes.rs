@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn new_names_in_parallel_prefixes() {
     // w[x].(| [x]w(x).x(b).() [a]w[y].a(c).() x[z].() ) w(a).a[z].()
-    let (w, x, y, z) = (&n("w"), &n("x"), &n("y"), &n("z"));
-    let (a, b, c) = (&n("a"), &n("b"), &n("c"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y z a b c });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     {
@@ -22,7 +22,6 @@ fn new_names_in_parallel_prefixes() {
     builder
         .send(w).names(&[a]).call(log("w(a)", actual))
         .read(a).names(&[z]).call(log("a[z]", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
@@ -33,15 +32,15 @@ fn new_names_in_parallel_prefixes() {
     pipl.step();
     let refs_wxwx = &mut refs_wx.clone();
     let refs_wxwy = &mut refs_wx.clone();
-    let x2 = x.dup();
+    let x2 = pipl.dup_name(x);
     refs_wxwx.set(x.clone(), x2.clone());
     refs_wxwy.set(y.clone(), x2.clone());
-    refs_wxwy.set(a.clone(), a.dup());
+    refs_wxwy.set(a.clone(), pipl.dup_name(a));
     expected.log("[a]w[y]", refs_wxwy.clone());
     expected.log("[x]w(x)", refs_wxwx.clone());
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
     assert_ne_names(&actual.get(&"[a]w[y]").get(0).unwrap().get(a), a);
     assert_ne_names(&actual.get(&"[x]w(x)").get(0).unwrap().get(x), x);
     assert_eq!(

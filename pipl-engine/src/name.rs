@@ -1,47 +1,56 @@
 use std::fmt;
-use std::hash::Hash;
-use std::hash::Hasher;
-use std::rc::Rc;
-pub struct Name<T>(Rc<Rc<T>>);
-impl<T> Name<T> {
-    pub fn new(name: T) -> Self {
-        Name(Rc::new(Rc::new(name)))
-    }
-    pub fn dup(&self) -> Self {
-        Name(Rc::new((*self.0).clone()))
-    }
-    pub fn raw(&self) -> &T {
-        &**self.0
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct Name {
+    slot_id: usize,
+    version: usize
+}
+impl Name {
+    pub(crate) fn new(slot_id: usize, version: usize) -> Self {
+        Name{ slot_id, version }
     }
 }
-impl<T> Clone for Name<T> {
-    fn clone(&self) -> Self {
-        Name(self.0.clone())
-    }
-}
-impl<T: fmt::Debug> fmt::Debug for Name<T> {
+impl fmt::Debug for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Name({:?})", &*self.0)
+        write!(f, "Name({:?}, {:?})", self.slot_id, self.version)
     }
 }
-impl<T> Hash for Name<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (&*self.0 as * const Rc<T>).hash(state);
+pub struct NameStore<T> {
+    values: Vec<T>,
+    versions: Vec<usize>,
+}
+impl<T> NameStore<T> {
+    pub(crate) fn new() -> Self {
+        NameStore {
+            values: Vec::new(),
+            versions: Vec::new(),
+        }
+    }
+    pub fn new_name(&mut self, data: T) -> Name {
+        let name = Name::new(self.values.len(), 0);
+        self.values.push(data);
+        self.versions.push(0);
+        name
+    }
+    pub fn get_value(&self, name: &Name) -> Option<&T> {
+        self.values.get(name.slot_id)
+    }
+    pub fn dup_name(&mut self, name: &Name) -> Name {
+        let version = self.versions.get_mut(name.slot_id).unwrap();
+        *version += 1;
+        Name::new(name.slot_id, *version)
     }
 }
-impl<T> PartialEq for Name<T> {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-impl<T> Eq for Name<T> {}
-#[cfg(test)]
-mod tests {
-    use super::Name;
-    #[test]
-    fn clone_vs_dup() {
-        let name = Name::new(());
-        assert_eq!(name, name.clone());
-        assert_ne!(name, name.dup());
+impl<T: fmt::Debug> fmt::Debug for NameStore<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let names = self.values.iter()
+            .zip(self.versions.iter())
+            .enumerate().map(|(i, (x, v))| {
+                format!("{} [{}]: {:?}", i, v, x)
+            }).collect::<Vec<String>>();
+        if f.alternate() {
+            write!(f, "{:#?}", names)
+        } else {
+            write!(f, "{:?}", names)
+        }
     }
 }

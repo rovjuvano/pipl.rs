@@ -2,8 +2,8 @@ use helpers::*;
 #[test]
 fn multi_step_reaction() {
     // w[x].w[y] w(a).w(b)
-    let (w, x, y) = (&n("w"), &n("x"), &n("y"));
-    let (a, b) = (&n("a"), &n("b"));
+    let mut pipl = Pipl::new();
+    names!(|pipl| { w x y a b });
     let actual = &Rc::new(Results::new());
     let mut builder = PiplBuilder::new();
     builder
@@ -12,7 +12,6 @@ fn multi_step_reaction() {
     builder
         .send(w).names(&[a]).call(log("w(a)", actual))
         .send(w).names(&[b]).call(log("w(b)", actual));
-    let mut pipl = Pipl::new();
     builder.apply(&mut pipl);
     let expected = &Rc::new(Results::new());
     let refs = &mut Refs::new();
@@ -24,5 +23,5 @@ fn multi_step_reaction() {
     expected.log("w[y]", refs.clone());
     pipl.step();
     pipl.step();
-    assert_eq_results(actual, expected);
+    assert_eq_results(&pipl, actual, expected);
 }

@@ -3,15 +3,15 @@ use ::refs::Refs;
 use std::hash::Hash;
 use std::hash::Hasher;
 #[derive(Debug)]
-pub enum Channel<T> {
-    Read(Name<T>),
-    Send(Name<T>),
+pub enum Channel {
+    Read(Name),
+    Send(Name),
 }
-impl<T> Channel<T> {
-    pub fn read(name: Name<T>) -> Self {
+impl Channel {
+    pub fn read(name: Name) -> Self {
         Channel::Read(name)
     }
-    pub fn send(name: Name<T>) -> Self {
+    pub fn send(name: Name) -> Self {
         Channel::Send(name)
     }
     pub fn invert(&self) -> Self {
@@ -20,21 +20,21 @@ impl<T> Channel<T> {
             &Channel::Send(ref name) => Self::read(name.clone()),
         }
     }
-    pub fn translate(&self, refs: &Refs<T>) -> Self {
+    pub fn translate(&self, refs: &Refs) -> Self {
         let name = refs.get(self.name());
         match self {
             &Channel::Read(_) => Self::read(name),
             &Channel::Send(_) => Self::send(name),
         }
     }
-    pub fn name(&self) -> &Name<T> {
+    pub fn name(&self) -> &Name {
         match self {
             &Channel::Read(ref name) => name,
             &Channel::Send(ref name) => name,
         }
     }
 }
-impl<T> Clone for Channel<T> {
+impl Clone for Channel {
     fn clone(&self) -> Self {
         match self {
             Channel::Send(x) => Channel::Send(x.clone()),
@@ -42,7 +42,7 @@ impl<T> Clone for Channel<T> {
         }
     }
 }
-impl<T> Hash for Channel<T> {
+impl Hash for Channel {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let (dir, name) = match self {
             Channel::Send(x) => (true, x),
@@ -52,7 +52,7 @@ impl<T> Hash for Channel<T> {
         name.hash(state);
     }
 }
-impl<T> PartialEq for Channel<T> {
+impl PartialEq for Channel {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Channel::Send(a), Channel::Send(b)) => a == b,
@@ -61,14 +61,14 @@ impl<T> PartialEq for Channel<T> {
         }
     }
 }
-impl<T> Eq for Channel<T> {}
+impl Eq for Channel {}
 #[cfg(test)]
 mod tests {
     use super::Channel;
     use ::name::Name;
     use ::refs::Refs;
-    fn n<T>(name: T) -> Name<T> {
-        Name::new(name)
+    fn n(name: char) -> Name {
+        Name::new((name.to_digit(36).unwrap() as u8).into(), 0)
     }
     #[test]
     fn read() {
