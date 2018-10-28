@@ -1,0 +1,6 @@
+[package]
+name = "pipl-engine"
+version = "0.0.1"
+authors = ["Robert Juliano <rovjuvano@gmail.com>"]
+
+[dependencies]
