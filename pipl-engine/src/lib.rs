@@ -107,26 +107,22 @@ enum InnerMolecule {
 }
 #[derive(Debug, Default)]
 struct Solution {
-    molecules: Vec<InnerMolecule>,
     inner: InnerSolution,
+    molecules: MoleculeStore,
 }
 impl Solution {
     fn new() -> Self {
         Solution {
-            molecules: vec![InnerMolecule::Product(Product::Parallel(Vec::new()))],
             inner: InnerSolution::new(),
+            molecules: MoleculeStore::new(),
         }
     }
     fn add_reactant(&mut self, reactant: Reactant, product: Molecule) -> Molecule {
-        self.add_substance(InnerMolecule::Reaction(reactant, product))
+        self.molecules
+            .insert(InnerMolecule::Reaction(reactant, product))
     }
     fn add_product(&mut self, product: Product) -> Molecule {
-        self.add_substance(InnerMolecule::Product(product))
-    }
-    fn add_substance(&mut self, substance: InnerMolecule) -> Molecule {
-        let id = self.molecules.len();
-        self.molecules.push(substance);
-        Molecule(id)
+        self.molecules.insert(InnerMolecule::Product(product))
     }
     fn excite(&mut self, processor: Processor) {
         self.inner.excite(&self.molecules, processor);
@@ -147,8 +143,8 @@ impl InnerSolution {
             ready: ReadySet::new(),
         }
     }
-    fn excite(&mut self, molecules: &[InnerMolecule], mut processor: Processor) {
-        match molecules.get(processor.molecule.0) {
+    fn excite(&mut self, molecules: &MoleculeStore, mut processor: Processor) {
+        match molecules.get(processor.molecule) {
             Some(InnerMolecule::Reaction(Reactant::Read(atom, ..), ..)) => {
                 self.excite_simple(*atom, processor, true);
             }
@@ -181,7 +177,7 @@ impl InnerSolution {
             self.ready.insert(atom);
         }
     }
-    fn step(&mut self, molecules: &[InnerMolecule]) {
+    fn step(&mut self, molecules: &MoleculeStore) {
         if let Some(atom) = self.ready.next() {
             let (read, send) = self.reactions.next(atom);
             if self.reactions.is_waiting(atom) {
@@ -190,11 +186,8 @@ impl InnerSolution {
             self.react(molecules, read, send);
         }
     }
-    fn react(&mut self, molecules: &[InnerMolecule], mut read: Processor, send: Processor) {
-        match (
-            molecules.get(read.molecule.0),
-            molecules.get(send.molecule.0),
-        ) {
+    fn react(&mut self, molecules: &MoleculeStore, mut read: Processor, send: Processor) {
+        match (molecules.get(read.molecule), molecules.get(send.molecule)) {
             (
                 Some(InnerMolecule::Reaction(Reactant::Read(_, keys), mr)),
                 Some(InnerMolecule::Reaction(Reactant::Send(_, values), ms)),
@@ -208,8 +201,8 @@ impl InnerSolution {
         self.excite_next(molecules, send);
     }
     #[allow(needless_pass_by_value)]
-    fn excite_next(&mut self, molecules: &[InnerMolecule], mut processor: Processor) {
-        match molecules.get(processor.molecule.0) {
+    fn excite_next(&mut self, molecules: &MoleculeStore, mut processor: Processor) {
+        match molecules.get(processor.molecule) {
             Some(InnerMolecule::Reaction(_, m))
             | Some(InnerMolecule::Product(Product::Call(_, m))) => {
                 processor.molecule = *m;
@@ -224,6 +217,25 @@ impl InnerSolution {
             }
             None => {}
         };
+    }
+}
+#[derive(Debug, Default)]
+struct MoleculeStore {
+    data: Vec<InnerMolecule>,
+}
+impl MoleculeStore {
+    fn new() -> Self {
+        MoleculeStore {
+            data: vec![InnerMolecule::Product(Product::Parallel(Vec::new()))],
+        }
+    }
+    fn get(&self, molecule: Molecule) -> Option<&InnerMolecule> {
+        self.data.get(molecule.0)
+    }
+    fn insert(&mut self, molecule: InnerMolecule) -> Molecule {
+        let id = self.data.len();
+        self.data.push(molecule);
+        Molecule(id)
     }
 }
 #[derive(Debug)]
