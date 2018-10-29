@@ -108,15 +108,13 @@ enum InnerMolecule {
 #[derive(Debug, Default)]
 struct Solution {
     molecules: Vec<InnerMolecule>,
-    ready: ReadySet,
-    reactions: ReactionSet,
+    inner: InnerSolution,
 }
 impl Solution {
     fn new() -> Self {
         Solution {
             molecules: vec![InnerMolecule::Product(Product::Parallel(Vec::new()))],
-            reactions: ReactionSet::new(),
-            ready: ReadySet::new(),
+            inner: InnerSolution::new(),
         }
     }
     fn add_reactant(&mut self, reactant: Reactant, product: Molecule) -> Molecule {
@@ -130,41 +128,46 @@ impl Solution {
         self.molecules.push(substance);
         Molecule(id)
     }
-    fn excite(&mut self, mut processor: Processor) {
-        #[derive(Debug)]
-        enum Excite {
-            Atom(Atom, bool),
-            Molecule(Molecule),
-            Molecules(Vec<Molecule>),
-            None,
+    fn excite(&mut self, processor: Processor) {
+        self.inner.excite(&self.molecules, processor);
+    }
+    fn step(&mut self) {
+        self.inner.step(&self.molecules);
+    }
+}
+#[derive(Debug, Default)]
+struct InnerSolution {
+    ready: ReadySet,
+    reactions: ReactionSet,
+}
+impl InnerSolution {
+    fn new() -> Self {
+        InnerSolution {
+            reactions: ReactionSet::new(),
+            ready: ReadySet::new(),
         }
-        let action = if let Some(m) = self.molecules.get(processor.molecule.0) {
-            match m {
-                InnerMolecule::Reaction(Reactant::Read(a, ..), ..) => Excite::Atom(*a, true),
-                InnerMolecule::Reaction(Reactant::Send(a, ..), ..) => Excite::Atom(*a, false),
-                InnerMolecule::Product(Product::Call(c, m)) => {
-                    c.0();
-                    Excite::Molecule(*m)
-                }
-                InnerMolecule::Product(Product::Choice(_)) => unimplemented!(),
-                InnerMolecule::Product(Product::Parallel(set)) => Excite::Molecules(set.clone()),
+    }
+    fn excite(&mut self, molecules: &[InnerMolecule], mut processor: Processor) {
+        match molecules.get(processor.molecule.0) {
+            Some(InnerMolecule::Reaction(Reactant::Read(atom, ..), ..)) => {
+                self.excite_simple(*atom, processor, true);
             }
-        } else {
-            Excite::None
-        };
-        match action {
-            Excite::Atom(atom, is_read) => self.excite_simple(atom, processor, is_read),
-            Excite::Molecule(m) => {
-                processor.molecule = m;
-                self.excite(processor);
+            Some(InnerMolecule::Reaction(Reactant::Send(atom, ..), ..)) => {
+                self.excite_simple(*atom, processor, false);
             }
-            Excite::Molecules(set) => {
+            Some(InnerMolecule::Product(Product::Call(c, m))) => {
+                c.0();
+                processor.molecule = *m;
+                self.excite(molecules, processor);
+            }
+            Some(InnerMolecule::Product(Product::Choice(_))) => unimplemented!(),
+            Some(InnerMolecule::Product(Product::Parallel(set))) => {
                 for m in set {
-                    let p = processor.clone_with(m);
-                    self.excite(p);
+                    let p = processor.clone_with(*m);
+                    self.excite(molecules, p);
                 }
             }
-            Excite::None => {}
+            None => {}
         }
     }
     fn excite_simple(&mut self, atom: Atom, processor: Processor, is_read: bool) {
@@ -178,19 +181,19 @@ impl Solution {
             self.ready.insert(atom);
         }
     }
-    pub fn step(&mut self) {
+    fn step(&mut self, molecules: &[InnerMolecule]) {
         if let Some(atom) = self.ready.next() {
             let (read, send) = self.reactions.next(atom);
             if self.reactions.is_waiting(atom) {
                 self.ready.insert(atom);
             }
-            self.react(read, send);
+            self.react(molecules, read, send);
         }
     }
-    fn react(&mut self, mut read: Processor, send: Processor) {
+    fn react(&mut self, molecules: &[InnerMolecule], mut read: Processor, send: Processor) {
         match (
-            self.molecules.get(read.molecule.0),
-            self.molecules.get(send.molecule.0),
+            molecules.get(read.molecule.0),
+            molecules.get(send.molecule.0),
         ) {
             (
                 Some(InnerMolecule::Reaction(Reactant::Read(_, keys), mr)),
@@ -201,37 +204,26 @@ impl Solution {
             }
             _ => unreachable!(),
         };
-        self.excite_next(read);
-        self.excite_next(send);
+        self.excite_next(molecules, read);
+        self.excite_next(molecules, send);
     }
     #[allow(needless_pass_by_value)]
-    fn excite_next(&mut self, mut processor: Processor) {
-        #[derive(Debug)]
-        enum Excite {
-            One(Molecule),
-            Many(Vec<Molecule>),
-            None,
-        }
-        let action = match self.molecules.get(processor.molecule.0) {
-            Some(InnerMolecule::Reaction(_, m)) => Excite::One(*m),
-            Some(InnerMolecule::Product(Product::Call(_, m))) => Excite::One(*m),
-            Some(InnerMolecule::Product(Product::Choice(set))) => Excite::Many(set.clone()),
-            Some(InnerMolecule::Product(Product::Parallel(_set))) => unimplemented!(),
-            None => Excite::None,
-        };
-        match action {
-            Excite::One(m) => {
-                processor.molecule = m;
-                self.excite(processor);
+    fn excite_next(&mut self, molecules: &[InnerMolecule], mut processor: Processor) {
+        match molecules.get(processor.molecule.0) {
+            Some(InnerMolecule::Reaction(_, m))
+            | Some(InnerMolecule::Product(Product::Call(_, m))) => {
+                processor.molecule = *m;
+                self.excite(molecules, processor);
             }
-            Excite::Many(set) => {
+            Some(InnerMolecule::Product(Product::Choice(_set))) => unimplemented!(),
+            Some(InnerMolecule::Product(Product::Parallel(set))) => {
                 for m in set {
-                    let p = processor.clone_with(m);
-                    self.excite(p);
+                    let p = processor.clone_with(*m);
+                    self.excite(molecules, p);
                 }
             }
-            Excite::None => {}
-        }
+            None => {}
+        };
     }
 }
 #[derive(Debug)]
