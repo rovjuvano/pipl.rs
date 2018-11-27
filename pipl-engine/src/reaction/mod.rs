@@ -4,9 +4,9 @@ use self::choice::ChoiceReaction;
 pub mod sequence;
 use self::sequence::SequenceReaction;
 
-use ::channel::Channel;
-use ::prefix::Prefix;
-use ::refs::Refs;
+use crate::channel::Channel;
+use crate::prefix::Prefix;
+use crate::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
 pub enum Reaction<T> {
@@ -23,14 +23,14 @@ impl<T> Reaction<T> {
     pub fn channels(&self) -> Vec<&Channel> {
         use self::Reaction::*;
         match self {
-            &Choice(ref c)   => c.channels(),
+            &Choice(ref c) => c.channels(),
             &Sequence(ref s) => s.channels(),
         }
     }
     pub fn refs(&self) -> &Refs {
         use self::Reaction::*;
         match self {
-            &Choice(ref c)   => c.refs(),
+            &Choice(ref c) => c.refs(),
             &Sequence(ref s) => s.refs(),
         }
     }

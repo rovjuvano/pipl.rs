@@ -1,4 +1,4 @@
-use ::name::Name;
+use crate::name::Name;
 use std::collections::HashMap;
 #[derive(Debug, Eq, PartialEq)]
 pub struct Refs {
@@ -6,15 +6,15 @@ pub struct Refs {
 }
 impl Refs {
     pub fn new() -> Self {
-        Refs { refs: HashMap::new() }
+        Refs {
+            refs: HashMap::new(),
+        }
     }
     pub fn get(&self, key: &Name) -> Name {
         self.refs.get(key).unwrap_or(key).clone()
     }
     pub fn get_names(&self, keys: &[Name]) -> Vec<Name> {
-        keys.iter().map(|k| {
-            self.get(k)
-        }).collect()
+        keys.iter().map(|k| self.get(k)).collect()
     }
     pub fn keys(&self) -> Vec<&Name> {
         self.refs.keys().collect()
@@ -30,7 +30,9 @@ impl Refs {
 }
 impl Clone for Refs {
     fn clone(&self) -> Self {
-        Refs { refs: self.refs.clone() }
+        Refs {
+            refs: self.refs.clone(),
+        }
     }
 }
 #[cfg(test)]
@@ -57,7 +59,7 @@ mod tests {
     fn get_names() {
         let mut subject = Refs::new();
         let (k1, v1) = (n(1), n(2));
-        let (k2,)    = (n(2),);
+        let (k2,) = (n(2),);
         let (k3, v3) = (n(3), n(3));
         subject.refs.insert(k1.clone(), v1.clone());
         subject.refs.insert(k3.clone(), v3.clone());

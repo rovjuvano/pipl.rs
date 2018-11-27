@@ -2,11 +2,11 @@ use std::fmt;
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Name {
     slot_id: usize,
-    version: usize
+    version: usize,
 }
 impl Name {
     pub(crate) fn new(slot_id: usize, version: usize) -> Self {
-        Name{ slot_id, version }
+        Name { slot_id, version }
     }
 }
 impl fmt::Debug for Name {
@@ -42,11 +42,13 @@ impl<T> NameStore<T> {
 }
 impl<T: fmt::Debug> fmt::Debug for NameStore<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let names = self.values.iter()
+        let names = self
+            .values
+            .iter()
             .zip(self.versions.iter())
-            .enumerate().map(|(i, (x, v))| {
-                format!("{} [{}]: {:?}", i, v, x)
-            }).collect::<Vec<String>>();
+            .enumerate()
+            .map(|(i, (x, v))| format!("{} [{}]: {:?}", i, v, x))
+            .collect::<Vec<String>>();
         if f.alternate() {
             write!(f, "{:#?}", names)
         } else {

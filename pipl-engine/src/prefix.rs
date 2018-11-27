@@ -1,6 +1,6 @@
-use ::call::Call;
-use ::channel::Channel;
-use ::name::Name;
+use crate::call::Call;
+use crate::channel::Channel;
+use crate::name::Name;
 use std::rc::Rc;
 #[derive(Debug)]
 pub enum Action<T> {

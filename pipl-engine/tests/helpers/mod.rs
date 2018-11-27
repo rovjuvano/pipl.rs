@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 pub use pipl_engine::{Call, CallFrame, Name, Pipl, PiplBuilder, Refs};
 use std::cell::RefCell;
-use std::hash::Hash;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::hash::Hash;
 pub use std::rc::Rc;
-#[macro_export] macro_rules! names {
+#[macro_export]
+macro_rules! names {
     (|$pipl:ident| { $($name:ident)* }) => {
         let ( $($name,)* ) = ( $( &$pipl.new_name(N::Str(stringify!($name))), )* );
     };
@@ -31,16 +32,19 @@ impl Results {
         Results(RefCell::new(HashMap::new()))
     }
     pub fn log<K: Into<String>>(&self, key: K, refs: Refs) {
-        self.0.borrow_mut()
+        self.0
+            .borrow_mut()
             .entry(key.into())
             .or_insert(Vec::new())
             .push(refs);
     }
     pub fn get(&self, key: &str) -> Vec<Refs> {
-        self.0.borrow()
+        self.0
+            .borrow()
             .get(key)
             .or(Some(&Vec::with_capacity(0)))
-            .unwrap().clone()
+            .unwrap()
+            .clone()
     }
 }
 #[derive(Debug)]
@@ -64,7 +68,10 @@ impl Call<N> for ResultsCall {
 pub fn log<K: Into<String>>(key: K, results: &Rc<Results>) -> Rc<Call<N>> {
     Rc::new(ResultsCall::new(key, results.clone()))
 }
-fn diff<'a, T: Eq + Hash>(left: &'a HashSet<T>, right: &'a HashSet<T>) -> (HashSet<&'a T>, HashSet<&'a T>) {
+fn diff<'a, T: Eq + Hash>(
+    left: &'a HashSet<T>,
+    right: &'a HashSet<T>,
+) -> (HashSet<&'a T>, HashSet<&'a T>) {
     let diff_left = left.difference(&right).collect::<HashSet<_>>();
     let diff_right = right.difference(&left).collect::<HashSet<_>>();
     (diff_left, diff_right)
@@ -79,7 +86,7 @@ pub fn assert_eq_results(pipl: &Pipl<N>, left: &Rc<Results>, right: &Rc<Results>
     }
 }
 fn assert_eq_refs_list(pipl: &Pipl<N>, left: Vec<Refs>, right: Vec<Refs>, key: &String) {
-    for (i,(l, r)) in left.iter().zip(right.iter()).enumerate() {
+    for (i, (l, r)) in left.iter().zip(right.iter()).enumerate() {
         assert_eq_refs(pipl, l, r, key, i);
     }
     assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
@@ -92,9 +99,13 @@ fn assert_eq_refs(pipl: &Pipl<N>, left: &Refs, right: &Refs, key: &String, i: us
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
     assert_eq!(diff_left, diff_right, "results[{:?}][{:?}].keys()", key, i);
     for k in keys_left.iter() {
-        let left_name = &left.get(k);
-        let right_name = &right.get(k);
-        assert_eq!(pipl.get_value(left_name), pipl.get_value(right_name), "results[{:?}][{:?}][{:?}]", key, i, k);
+        let left_value = pipl.get_value(&left.get(k));
+        let right_value = pipl.get_value(&right.get(k));
+        assert_eq!(
+            left_value, right_value,
+            "results[{:?}][{:?}][{:?}]",
+            key, i, k
+        );
     }
 }
 pub fn assert_ne_names(left: &Name, right: &Name) {

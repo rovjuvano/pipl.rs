@@ -1,9 +1,9 @@
-use ::call::Call;
-use ::channel::Channel;
-use ::name::Name;
-use ::pipl::Pipl;
-use ::prefix::Prefix;
-use ::prefix::Action;
+use crate::call::Call;
+use crate::channel::Channel;
+use crate::name::Name;
+use crate::pipl::Pipl;
+use crate::prefix::Action;
+use crate::prefix::Prefix;
 use std::rc::Rc;
 pub enum Builder<T> {
     Prefix(PrefixBuilder<T>),
@@ -87,11 +87,13 @@ impl<T> PrefixBuilder<T> {
     }
     fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
         use std::borrow::BorrowMut;
-        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(prefix_type, name.clone())));
+        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(
+            prefix_type,
+            name.clone(),
+        )));
         if let &mut Builder::Prefix(ref mut b) = self.next.borrow_mut() {
             b
-        }
-        else {
+        } else {
             unreachable!()
         }
     }
@@ -109,8 +111,7 @@ impl<T> PrefixBuilder<T> {
         self.next = Box::new(Builder::Parallel(ParallelBuilder::new()));
         if let &mut Builder::Parallel(ref mut b) = self.next.borrow_mut() {
             b
-        }
-        else {
+        } else {
             unreachable!()
         }
     }
@@ -120,8 +121,7 @@ impl<T> PrefixBuilder<T> {
         self.next = Box::new(Builder::Choice(ChoiceBuilder::new()));
         if let &mut Builder::Choice(ref mut b) = self.next.borrow_mut() {
             b
-        }
-        else {
+        } else {
             unreachable!()
         }
     }
@@ -159,16 +159,16 @@ impl<T> PrefixBuilder<T> {
                     actions.push(Action::Restrict(restricts));
                 }
                 actions.push(Action::Choice(sequences));
-            },
+            }
             Builder::Parallel(b) => {
                 let (restricts, sequences) = b.build();
                 if restricts.len() > 0 {
                     actions.push(Action::Restrict(restricts));
                 }
                 actions.push(Action::Parallel(sequences));
-            },
+            }
             Builder::Prefix(b) => actions.push(Action::Prefix(Rc::new(b.build()))),
-            Builder::Terminal => {},
+            Builder::Terminal => {}
         };
         Prefix::new(channel, actions)
     }
@@ -189,7 +189,7 @@ impl<T> ParallelBuilder<T> {
         self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
+    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
         let b = PrefixBuilder::new(prefix_type, name.clone());
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
@@ -203,7 +203,10 @@ impl<T> ParallelBuilder<T> {
         self.prefix(PrefixType::Send, name)
     }
     fn build(self) -> (Vec<Name>, Vec<Rc<Prefix<T>>>) {
-        let ParallelBuilder { restricts, sequences } = self;
+        let ParallelBuilder {
+            restricts,
+            sequences,
+        } = self;
         let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
         (restricts, p)
     }
@@ -224,7 +227,7 @@ impl<T> ChoiceBuilder<T> {
         self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn  prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
+    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
         let b = PrefixBuilder::new(prefix_type, name.clone());
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
@@ -238,7 +241,10 @@ impl<T> ChoiceBuilder<T> {
         self.prefix(PrefixType::Send, name)
     }
     fn build(self) -> (Vec<Name>, Vec<Rc<Prefix<T>>>) {
-        let ChoiceBuilder { restricts, sequences } = self;
+        let ChoiceBuilder {
+            restricts,
+            sequences,
+        } = self;
         let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
         (restricts, p)
     }

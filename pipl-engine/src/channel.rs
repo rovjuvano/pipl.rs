@@ -1,5 +1,5 @@
-use ::name::Name;
-use ::refs::Refs;
+use crate::name::Name;
+use crate::refs::Refs;
 use std::hash::Hash;
 use std::hash::Hasher;
 #[derive(Debug)]
@@ -65,8 +65,8 @@ impl Eq for Channel {}
 #[cfg(test)]
 mod tests {
     use super::Channel;
-    use ::name::Name;
-    use ::refs::Refs;
+    use crate::name::Name;
+    use crate::refs::Refs;
     fn n(name: char) -> Name {
         Name::new((name.to_digit(36).unwrap() as u8).into(), 0)
     }

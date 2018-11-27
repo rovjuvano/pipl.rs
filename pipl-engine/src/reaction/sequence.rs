@@ -1,10 +1,10 @@
-use ::channel::Channel;
-use ::call::CallFrame;
-use ::name::Name;
-use ::pipl::mods::Mods;
-use ::prefix::Action;
-use ::prefix::Prefix;
-use ::refs::Refs;
+use crate::call::CallFrame;
+use crate::channel::Channel;
+use crate::name::Name;
+use crate::pipl::mods::Mods;
+use crate::prefix::Action;
+use crate::prefix::Prefix;
+use crate::refs::Refs;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct SequenceReaction<T> {
@@ -13,7 +13,10 @@ pub struct SequenceReaction<T> {
 }
 impl<T> SequenceReaction<T> {
     pub fn new(refs: Refs, prefix: Rc<Prefix<T>>) -> Self {
-        SequenceReaction { refs: refs, prefix: prefix }
+        SequenceReaction {
+            refs: refs,
+            prefix: prefix,
+        }
     }
     pub fn channels(&self) -> Vec<&Channel> {
         vec![self.prefix.channel()]
@@ -26,7 +29,12 @@ impl<T> SequenceReaction<T> {
         let SequenceReaction { refs, prefix } = self;
         Self::react(mods, refs, prefix, None).unwrap_or_else(|| Vec::new())
     }
-    fn react(mods: &mut Mods<T>, mut refs: Refs, prefix: Rc<Prefix<T>>, read_names: Option<Vec<Name>>) -> Option<Vec<Name>> {
+    fn react(
+        mods: &mut Mods<T>,
+        mut refs: Refs,
+        prefix: Rc<Prefix<T>>,
+        read_names: Option<Vec<Name>>,
+    ) -> Option<Vec<Name>> {
         let mut send_names = None;
         let mut iter = prefix.actions().iter();
         let mut action = iter.next();
@@ -51,16 +59,14 @@ impl<T> SequenceReaction<T> {
         }
         if let Some(&Action::Prefix(ref prefix)) = action {
             mods.add_sequence(refs, prefix.clone());
-        }
-        else {
+        } else {
             if let Some(&Action::Restrict(ref names)) = action {
                 mods.new_names(&mut refs, names);
                 action = iter.next();
             }
             if let Some(&Action::Parallel(ref sequences)) = action {
                 mods.add_parallel(refs, sequences.clone());
-            }
-            else if let Some(&Action::Choice(ref sequences)) = action {
+            } else if let Some(&Action::Choice(ref sequences)) = action {
                 mods.add_choice(refs, sequences.clone());
             }
         }

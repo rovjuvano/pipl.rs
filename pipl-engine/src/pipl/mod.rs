@@ -1,13 +1,13 @@
 pub mod mods;
 use self::mods::Mods;
 
-use ::channel::Channel;
-use ::name::Name;
-use ::name::NameStore;
-use ::prefix::Prefix;
-use ::reaction::Reaction;
-use ::reaction::sequence::SequenceReaction;
-use ::refs::Refs;
+use crate::channel::Channel;
+use crate::name::Name;
+use crate::name::NameStore;
+use crate::prefix::Prefix;
+use crate::reaction::sequence::SequenceReaction;
+use crate::reaction::Reaction;
+use crate::refs::Refs;
 use std::collections::HashMap;
 use std::rc::Rc;
 #[derive(Debug)]
@@ -58,7 +58,8 @@ impl<T> ReactionMap<T> {
         }
     }
     fn add(&mut self, channel: &Channel, reaction: Rc<Reaction<T>>) {
-        self.map.entry(channel.clone())
+        self.map
+            .entry(channel.clone())
             .or_insert(ReactionQueue::new())
             .add(reaction);
         if let Some(q) = self.map.get(&channel.invert()) {
@@ -75,7 +76,7 @@ impl<T> ReactionMap<T> {
             }
         }
         match Rc::try_unwrap(reaction).ok().unwrap() {
-            Reaction::Choice(c)   => c.collapse(channel),
+            Reaction::Choice(c) => c.collapse(channel),
             Reaction::Sequence(s) => s,
         }
     }
@@ -120,9 +121,7 @@ impl<T> ReactionQueue<T> {
         self.0.remove(0)
     }
     fn remove(&mut self, refs: &Refs) {
-        if let Some(i) = self.0.iter().position(|x| {
-            ::std::ptr::eq(x.refs(), refs)
-        }) {
+        if let Some(i) = self.0.iter().position(|x| ::std::ptr::eq(x.refs(), refs)) {
             self.0.remove(i);
         }
     }

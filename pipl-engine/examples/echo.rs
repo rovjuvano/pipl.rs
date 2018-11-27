@@ -19,15 +19,13 @@ impl Call<N> for EchoCall {
 }
 fn make_read(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>, echo: &Name) {
     let arg = pipl.new_name("".to_owned());
-    builder.read(echo)
-        .names(&[&arg])
-        .repeat()
+    builder
+        .read(echo).names(&[&arg]).repeat()
         .call(Rc::new(EchoCall::new(arg)));
 }
 fn make_send(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>, echo: &Name, arg: String) {
     let name = pipl.new_name(arg);
-    builder.send(echo)
-        .names(&[&name]);
+    builder.send(echo).names(&[&name]);
 }
 fn main() {
     let mut pipl = Pipl::new();

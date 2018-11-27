@@ -1,10 +1,10 @@
-use ::channel::Channel;
-use ::name::Name;
-use ::name::NameStore;
-use ::pipl::ReactionMap;
-use ::prefix::Prefix;
-use ::reaction::Reaction;
-use ::refs::Refs;
+use crate::channel::Channel;
+use crate::name::Name;
+use crate::name::NameStore;
+use crate::pipl::ReactionMap;
+use crate::prefix::Prefix;
+use crate::reaction::Reaction;
+use crate::refs::Refs;
 use std::clone::Clone;
 use std::rc::Rc;
 #[derive(Debug)]
@@ -14,7 +14,10 @@ pub struct Mods<'a, T: 'a> {
 }
 impl<'a, T: 'a> Mods<'a, T> {
     pub fn new(names: &'a mut NameStore<T>) -> Self {
-        Mods { names, new: Vec::new() }
+        Mods {
+            names,
+            new: Vec::new(),
+        }
     }
     pub(super) fn apply(self, reactions: &mut ReactionMap<T>) {
         for (channel, reaction) in self.new.into_iter() {
@@ -22,9 +25,10 @@ impl<'a, T: 'a> Mods<'a, T> {
         }
     }
     pub fn add_choice(&mut self, refs: Refs, sequences: Vec<Rc<Prefix<T>>>) {
-        let channels: Vec<_> = sequences.iter().map(|s|
-            s.channel().translate(&refs)
-        ).collect();
+        let channels: Vec<_> = sequences
+            .iter()
+            .map(|s| s.channel().translate(&refs))
+            .collect();
         let reaction = Rc::new(Reaction::new_choice(refs, sequences.clone()));
         for c in channels.into_iter() {
             self.new.push((c, reaction.clone()));
