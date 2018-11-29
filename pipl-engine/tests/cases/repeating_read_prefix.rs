@@ -24,27 +24,27 @@ fn repeating_read_prefix() {
     // w(a).a(c) !w[x].!x[y]
     expected.log("w(a)", refs_empty.clone());
     expected.log("a(c)", refs_empty.clone());
-    refs_wx1.set(x.clone(), a.clone());
+    refs_wx1.insert(x.clone(), a.clone());
     expected.log("!w[x]", refs_wx1.clone());
-    refs_wx1.set(y.clone(), c.clone());
+    refs_wx1.insert(y.clone(), c.clone());
     expected.log("!x[y]", refs_wx1.clone());
     pipl.step();
     pipl.step();
     // w(b).b(c) !w[x].!x[y]
     expected.log("w(b)", refs_empty.clone());
     expected.log("b(c)", refs_empty.clone());
-    refs_wx2.set(x.clone(), b.clone());
+    refs_wx2.insert(x.clone(), b.clone());
     expected.log("!w[x]", refs_wx2.clone());
-    refs_wx2.set(y.clone(), c.clone());
+    refs_wx2.insert(y.clone(), c.clone());
     expected.log("!x[y]", refs_wx2.clone());
     pipl.step();
     pipl.step();
     // a(d).b(e) !x[y].()
     expected.log("a(d)", refs_empty.clone());
     expected.log("b(e)", refs_empty.clone());
-    refs_wx1.set(y.clone(), d.clone());
+    refs_wx1.insert(y.clone(), d.clone());
     expected.log("!x[y]", refs_wx1.clone());
-    refs_wx2.set(y.clone(), e.clone());
+    refs_wx2.insert(y.clone(), e.clone());
     expected.log("!x[y]", refs_wx2.clone());
     pipl.step();
     pipl.step();

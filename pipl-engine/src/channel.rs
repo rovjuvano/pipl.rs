@@ -1,5 +1,4 @@
 use crate::name::Name;
-use crate::refs::Refs;
 use std::hash::Hash;
 use std::hash::Hasher;
 #[derive(Debug)]
@@ -14,17 +13,16 @@ impl Channel {
     pub fn send(name: Name) -> Self {
         Channel::Send(name)
     }
+    pub fn clone_with(&self, name: Name) -> Self {
+        match self {
+            &Channel::Read(_) => Self::read(name),
+            &Channel::Send(_) => Self::send(name),
+        }
+    }
     pub fn invert(&self) -> Self {
         match self {
             &Channel::Read(ref name) => Self::send(name.clone()),
             &Channel::Send(ref name) => Self::read(name.clone()),
-        }
-    }
-    pub fn translate(&self, refs: &Refs) -> Self {
-        let name = refs.get(self.name());
-        match self {
-            &Channel::Read(_) => Self::read(name),
-            &Channel::Send(_) => Self::send(name),
         }
     }
     pub fn name(&self) -> &Name {
@@ -66,7 +64,6 @@ impl Eq for Channel {}
 mod tests {
     use super::Channel;
     use crate::name::Name;
-    use crate::refs::Refs;
     fn n(name: char) -> Name {
         Name::new((name.to_digit(36).unwrap() as u8).into(), 0)
     }
@@ -87,17 +84,12 @@ mod tests {
         assert_eq!(Channel::send(y.clone()).invert(), Channel::read(y));
     }
     #[test]
-    fn translate() {
+    fn clone_with() {
         let (x, y) = (n('x'), n('y'));
         let (a, b) = (n('a'), n('b'));
-        let read = Channel::read(x.clone());
-        let send = Channel::send(y.clone());
-        let refs = &mut Refs::new();
-        assert_eq!(read.translate(refs), read);
-        assert_eq!(send.translate(refs), send);
-        refs.set(x, a.clone());
-        refs.set(y, b.clone());
-        assert_eq!(read.translate(refs), Channel::read(a));
-        assert_eq!(send.translate(refs), Channel::send(b));
+        let read = Channel::read(x);
+        let send = Channel::send(y);
+        assert_eq!(read.clone_with(a.clone()), Channel::read(a));
+        assert_eq!(send.clone_with(b.clone()), Channel::send(b));
     }
 }

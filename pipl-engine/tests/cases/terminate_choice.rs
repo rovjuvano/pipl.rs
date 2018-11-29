@@ -23,10 +23,10 @@ fn terminate_choice() {
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
     let refs_wx = &mut Refs::new();
-    refs_wx.set(x.clone(), a.clone());
+    refs_wx.insert(x.clone(), a.clone());
     expected.log("w[x]", refs_wx.clone());
     let refs_wxxy = &mut refs_wx.clone();
-    refs_wxxy.set(y.clone(), b.clone());
+    refs_wxxy.insert(y.clone(), b.clone());
     expected.log("x[y]", refs_wxxy.clone());
     expected.log("w(a)", refs_empty.clone());
     expected.log("a(b)", refs_empty.clone());

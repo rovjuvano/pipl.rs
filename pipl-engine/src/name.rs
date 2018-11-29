@@ -1,5 +1,5 @@
 use std::fmt;
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Name {
     slot_id: usize,
     version: usize,
@@ -25,19 +25,19 @@ impl<T> NameStore<T> {
             versions: Vec::new(),
         }
     }
+    pub fn dup_name(&mut self, name: &Name) -> Name {
+        let version = self.versions.get_mut(name.slot_id).unwrap();
+        *version += 1;
+        Name::new(name.slot_id, *version)
+    }
+    pub fn get_value(&self, name: &Name) -> Option<&T> {
+        self.values.get(name.slot_id)
+    }
     pub fn new_name(&mut self, data: T) -> Name {
         let name = Name::new(self.values.len(), 0);
         self.values.push(data);
         self.versions.push(0);
         name
-    }
-    pub fn get_value(&self, name: &Name) -> Option<&T> {
-        self.values.get(name.slot_id)
-    }
-    pub fn dup_name(&mut self, name: &Name) -> Name {
-        let version = self.versions.get_mut(name.slot_id).unwrap();
-        *version += 1;
-        Name::new(name.slot_id, *version)
     }
 }
 impl<T: fmt::Debug> fmt::Debug for NameStore<T> {

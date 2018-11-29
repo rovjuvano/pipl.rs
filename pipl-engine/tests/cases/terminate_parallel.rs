@@ -23,12 +23,12 @@ fn terminate_parallel() {
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
     let refs_wx = &mut Refs::new();
-    refs_wx.set(x.clone(), a.clone());
+    refs_wx.insert(x.clone(), a.clone());
     expected.log("w[x]", refs_wx.clone());
     let refs_wxxy = &mut refs_wx.clone();
     let refs_wxyz = &mut refs_wx.clone();
-    refs_wxxy.set(y.clone(), b.clone());
-    refs_wxyz.set(z.clone(), c.clone());
+    refs_wxxy.insert(y.clone(), b.clone());
+    refs_wxyz.insert(z.clone(), c.clone());
     expected.log("x[y]", refs_wxxy.clone());
     expected.log("y[z]", refs_wxyz.clone());
     expected.log("w(a)", refs_empty.clone());

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
-pub use pipl_engine::{Call, CallFrame, Name, Pipl, PiplBuilder, Refs};
+pub use pipl_engine::{Call, CallFrame, Name, Pipl, PiplBuilder};
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
@@ -25,6 +26,7 @@ pub enum N {
     VecStr(Vec<&'static str>),
     String(String),
 }
+pub type Refs = BTreeMap<Name, Name>;
 #[derive(Debug, Eq, PartialEq)]
 pub struct Results(RefCell<HashMap<String, Vec<Refs>>>);
 impl Results {
@@ -92,15 +94,13 @@ fn assert_eq_refs_list(pipl: &Pipl<N>, left: Vec<Refs>, right: Vec<Refs>, key: &
     assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
 }
 fn assert_eq_refs(pipl: &Pipl<N>, left: &Refs, right: &Refs, key: &String, i: usize) {
-    let keys_left = left.keys();
-    let keys_right = right.keys();
-    let keys_left = keys_left.iter().collect::<HashSet<_>>();
-    let keys_right = keys_right.iter().collect::<HashSet<_>>();
+    let keys_left = left.keys().collect::<HashSet<_>>();
+    let keys_right = right.keys().collect::<HashSet<_>>();
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
     assert_eq!(diff_left, diff_right, "results[{:?}][{:?}].keys()", key, i);
     for k in keys_left.iter() {
-        let left_value = pipl.get_value(&left.get(k));
-        let right_value = pipl.get_value(&right.get(k));
+        let left_value = pipl.get_value(&left.get(k).unwrap());
+        let right_value = pipl.get_value(&right.get(k).unwrap());
         assert_eq!(
             left_value, right_value,
             "results[{:?}][{:?}][{:?}]",

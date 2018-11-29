@@ -34,14 +34,14 @@ fn new_names_before_choice() {
     let refs_wx = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     let refs_yb = &mut Refs::new();
-    refs_wx.set(x.clone(), a.clone());
+    refs_wx.insert(x.clone(), a.clone());
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    refs_wx.set(w.clone(), pipl.dup_name(w));
-    refs_wx.set(x.clone(), pipl.dup_name(x));
+    refs_wx.insert(w.clone(), pipl.dup_name(w));
+    refs_wx.insert(x.clone(), pipl.dup_name(x));
     let refs_wxyp = &mut refs_wx.clone();
-    refs_wxyp.set(p.clone(), b.clone());
+    refs_wxyp.insert(p.clone(), b.clone());
     expected.log("y[p]", refs_wxyp.clone());
     expected.log("y(b)", refs_yb.clone());
     pipl.step();

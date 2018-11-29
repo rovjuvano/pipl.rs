@@ -12,8 +12,8 @@ fn polyadic() {
     let expected = &Rc::new(Results::new());
     let refs_empty = Refs::new();
     let refs_read = &mut Refs::new();
-    refs_read.set(x.clone(), a.clone());
-    refs_read.set(y.clone(), b.clone());
+    refs_read.insert(x.clone(), a.clone());
+    refs_read.insert(y.clone(), b.clone());
     expected.log("w[x,y]", refs_read.clone());
     expected.log("w(a,b)", refs_empty.clone());
     pipl.step();

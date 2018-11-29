@@ -1,31 +1,31 @@
-pub mod mods;
-use self::mods::Mods;
+pub(crate) mod context;
+pub(crate) mod processor;
 
 use crate::channel::Channel;
 use crate::name::Name;
 use crate::name::NameStore;
+use crate::pipl::context::Context;
+use crate::pipl::processor::Processor;
 use crate::prefix::Prefix;
-use crate::reaction::sequence::SequenceReaction;
-use crate::reaction::Reaction;
-use crate::refs::Refs;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl<T> {
-    map: ReactionMap<T>,
+    contexts: ContextStore<T>,
     names: NameStore<T>,
 }
 impl<T> Pipl<T> {
     pub fn new() -> Self {
         Pipl {
-            map: ReactionMap::new(),
+            contexts: ContextStore::new(),
             names: NameStore::new(),
         }
     }
     pub fn add(&mut self, prefix: Prefix<T>) {
         let channel = prefix.channel().clone();
-        let reaction = Reaction::new_sequence(Refs::new(), Rc::new(prefix));
-        self.map.add(&channel, Rc::new(reaction));
+        let context = Context::prefix(Rc::new(prefix));
+        self.contexts.add(&channel, context);
     }
     pub fn dup_name(&mut self, name: &Name) -> Name {
         self.names.dup_name(name)
@@ -37,55 +37,43 @@ impl<T> Pipl<T> {
         self.names.new_name(data)
     }
     pub fn step(&mut self) {
-        if let Some((reader, sender)) = self.map.next() {
-            let mut mods = Mods::new(&mut self.names);
-            let output = sender.send(&mut mods);
-            reader.read(&mut mods, output);
-            mods.apply(&mut self.map);
+        if let Some((name, reader, sender)) = self.contexts.next() {
+            Processor::new(&mut self.contexts, &mut self.names).activate(name, reader, sender);
         }
     }
 }
 #[derive(Debug)]
-pub(self) struct ReactionMap<T> {
-    map: HashMap<Channel, ReactionQueue<T>>,
+pub(crate) struct ContextStore<T> {
+    map: HashMap<Channel, ContextQueue<T>>,
     queue: ReadyQueue,
 }
-impl<T> ReactionMap<T> {
+impl<T> ContextStore<T> {
     fn new() -> Self {
-        ReactionMap {
+        ContextStore {
             map: HashMap::new(),
             queue: ReadyQueue::new(),
         }
     }
-    fn add(&mut self, channel: &Channel, reaction: Rc<Reaction<T>>) {
+    fn add(&mut self, channel: &Channel, context: Context<T>) {
         self.map
             .entry(channel.clone())
-            .or_insert(ReactionQueue::new())
-            .add(reaction);
+            .or_insert(ContextQueue::new())
+            .add(context);
         if let Some(q) = self.map.get(&channel.invert()) {
             if q.is_ready() {
                 self.queue.add(channel.name().clone());
             }
         }
     }
-    fn collapse(&mut self, channel: &Channel) -> SequenceReaction<T> {
-        let reaction = self.map.get_mut(channel).unwrap().next();
-        if Rc::strong_count(&reaction) > 1 {
-            for c in reaction.channels() {
-                self.remove(&c.translate(reaction.refs()), reaction.refs());
-            }
-        }
-        match Rc::try_unwrap(reaction).ok().unwrap() {
-            Reaction::Choice(c) => c.collapse(channel),
-            Reaction::Sequence(s) => s,
-        }
+    fn dequeue(&mut self, channel: &Channel) -> Context<T> {
+        self.map.get_mut(channel).unwrap().next()
     }
-    fn next(&mut self) -> Option<(SequenceReaction<T>, SequenceReaction<T>)> {
+    fn next(&mut self) -> Option<(Name, Context<T>, Context<T>)> {
         if let Some(name) = self.queue.next() {
             let read = &Channel::Read(name.clone());
             let send = &Channel::Send(name.clone());
             if self.still_ready(read, send) {
-                Some((self.collapse(read), self.collapse(send)))
+                Some((name, self.dequeue(read), self.dequeue(send)))
             } else {
                 self.next()
             }
@@ -93,7 +81,7 @@ impl<T> ReactionMap<T> {
             None
         }
     }
-    fn remove(&mut self, channel: &Channel, refs: &Refs) {
+    fn remove(&mut self, channel: &Channel, refs: &BTreeMap<Name, Name>) {
         if let Some(queue) = self.map.get_mut(channel) {
             queue.remove(refs);
         }
@@ -106,22 +94,28 @@ impl<T> ReactionMap<T> {
     }
 }
 #[derive(Debug)]
-struct ReactionQueue<T>(Vec<Rc<Reaction<T>>>);
-impl<T> ReactionQueue<T> {
+struct ContextQueue<T>(Vec<Context<T>>);
+impl<T> ContextQueue<T> {
     fn new() -> Self {
-        ReactionQueue(Vec::new())
+        ContextQueue(Vec::new())
     }
-    fn add(&mut self, reaction: Rc<Reaction<T>>) {
-        self.0.push(reaction);
+    fn add(&mut self, context: Context<T>) {
+        self.0.push(context);
     }
     fn is_ready(&self) -> bool {
         self.0.len() > 0
     }
-    fn next(&mut self) -> Rc<Reaction<T>> {
+    fn next(&mut self) -> Context<T> {
         self.0.remove(0)
     }
-    fn remove(&mut self, refs: &Refs) {
-        if let Some(i) = self.0.iter().position(|x| ::std::ptr::eq(x.refs(), refs)) {
+    fn remove(&mut self, refs: &BTreeMap<Name, Name>) {
+        if let Some(i) = self.0.iter().position(|x| {
+            if let Context::Choice(ctx) = x {
+                ::std::ptr::eq(&*ctx.map, refs)
+            } else {
+                false
+            }
+        }) {
             self.0.remove(i);
         }
     }

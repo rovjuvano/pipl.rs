@@ -16,12 +16,12 @@ fn simplest_mobility() {
     let expected = &Rc::new(Results::new());
     let refs_wx = &mut Refs::new();
     let refs_wz = &mut Refs::new();
-    refs_wz.set(z.clone(), x.clone());
+    refs_wz.insert(z.clone(), x.clone());
     expected.log("w(x)", refs_wx.clone());
     expected.log("w[z]", refs_wz.clone());
     pipl.step();
     assert_eq_results(&pipl, actual, expected);
-    refs_wx.set(y.clone(), x.clone());
+    refs_wx.insert(y.clone(), x.clone());
     expected.log("x[y]", refs_wx.clone());
     expected.log("z(z)", refs_wz.clone());
     pipl.step();

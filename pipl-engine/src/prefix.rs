@@ -14,7 +14,7 @@ pub enum Action<T> {
 }
 #[derive(Debug)]
 pub struct Prefix<T> {
-    pub(crate) channel: Channel,
+    channel: Channel,
     actions: Vec<Action<T>>,
 }
 impl<T> Prefix<T> {

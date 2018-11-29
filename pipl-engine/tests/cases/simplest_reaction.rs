@@ -12,7 +12,7 @@ fn simplest_reaction() {
     let expected = &Rc::new(Results::new());
     let refs = &mut Refs::new();
     expected.log("w(a)", refs.clone());
-    refs.set(x.clone(), a.clone());
+    refs.insert(x.clone(), a.clone());
     expected.log("w[x]", refs.clone());
     pipl.step();
     assert_eq_results(&pipl, actual, expected);

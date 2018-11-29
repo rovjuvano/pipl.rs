@@ -17,9 +17,9 @@ fn multi_step_reaction() {
     let refs = &mut Refs::new();
     expected.log("w(a)", refs.clone());
     expected.log("w(b)", refs.clone());
-    refs.set(x.clone(), a.clone());
+    refs.insert(x.clone(), a.clone());
     expected.log("w[x]", refs.clone());
-    refs.set(y.clone(), b.clone());
+    refs.insert(y.clone(), b.clone());
     expected.log("w[y]", refs.clone());
     pipl.step();
     pipl.step();
