@@ -1,6 +1,7 @@
 pub(crate) mod context;
 pub(crate) mod processor;
 
+use crate::bindings::Bindings;
 use crate::name::Name;
 use crate::name::NameStore;
 use crate::pipl::context::Context;
@@ -71,17 +72,14 @@ impl<T> ContextStore<T> {
             Context::Choice(ctx) => {
                 let mut r = None;
                 for p in ctx.prefixes.iter() {
-                    let n = ctx.get_name(p.name());
+                    let n = ctx.bindings.get_name(p.name());
                     if r.is_none() && *name == n && direction == p.direction() {
                         r = Some(p);
                     } else {
-                        self.set.remove(&n, p.direction(), &*ctx.map);
+                        self.set.remove(&n, p.direction(), &*ctx.bindings);
                     }
                 }
-                PrefixContext {
-                    map: Rc::try_unwrap(ctx.map).unwrap(),
-                    prefix: r.unwrap().clone(),
-                }
+                PrefixContext::new(r.unwrap().clone(), Rc::try_unwrap(ctx.bindings).unwrap())
             }
             Context::Prefix(ctx) => ctx,
         }
@@ -127,14 +125,14 @@ impl<T> ContextSet<T> {
         let mut x = self.set.remove(name).unwrap();
         (x.0.remove(0), x.1.remove(0))
     }
-    fn remove(&mut self, name: &Name, direction: PrefixDirection, refs: &BTreeMap<Name, Name>) {
+    fn remove(&mut self, name: &Name, direction: PrefixDirection, bindings: &Bindings) {
         if let Some((reads, sends)) = self.set.get_mut(name) {
             let queue = match direction {
                 PrefixDirection::Read => reads,
                 PrefixDirection::Send => sends,
             };
             if let Some(i) = queue.iter().position(|x| match x {
-                Context::Choice(ctx) => ::std::ptr::eq(&*ctx.map, refs),
+                Context::Choice(ctx) => ::std::ptr::eq(&*ctx.bindings, bindings),
                 _ => false,
             }) {
                 queue.remove(i);

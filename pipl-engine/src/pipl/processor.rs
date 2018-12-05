@@ -44,18 +44,20 @@ impl<'a, T> Processor<'a, T> {
             action = iter.next();
         }
         if let Some(&Action::Restrict(ref list)) = action {
-            ctx.new_names(self.names, list);
+            ctx.bindings.new_names(self.names, list);
             action = iter.next();
         }
         if let Some(&Action::Communicate(ref list)) = action {
             match ctx.prefix.direction() {
-                PrefixDirection::Read => ctx.set_names(list, read_names.unwrap_or_else(Vec::new)),
-                PrefixDirection::Send => send_names = Some(ctx.get_names(list)),
+                PrefixDirection::Read => {
+                    ctx.bindings.set_names(list, read_names.unwrap_or_default())
+                }
+                PrefixDirection::Send => send_names = Some(ctx.bindings.get_names(list)),
             }
             action = iter.next();
         }
         if let Some(&Action::Call(ref call)) = action {
-            call.call(CallFrame::new(&mut ctx, self.names));
+            call.call(CallFrame::new(&mut ctx.bindings, self.names));
             action = iter.next();
         }
         if let Some(&Action::Prefix(ref prefix)) = action {
@@ -63,7 +65,7 @@ impl<'a, T> Processor<'a, T> {
             self.add_prefix(ctx);
         } else {
             if let Some(&Action::Restrict(ref list)) = action {
-                ctx.new_names(self.names, list);
+                ctx.bindings.new_names(self.names, list);
                 action = iter.next();
             }
             if let Some(&Action::Parallel(ref list)) = action {

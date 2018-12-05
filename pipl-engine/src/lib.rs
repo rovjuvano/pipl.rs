@@ -1,5 +1,6 @@
 #![deny(bare_trait_objects)]
 
+mod bindings;
 mod builder;
 mod call;
 mod name;

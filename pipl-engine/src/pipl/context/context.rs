@@ -1,8 +1,8 @@
+use crate::bindings::Bindings;
 use crate::name::Name;
 use crate::pipl::context::ChoiceContext;
 use crate::pipl::context::PrefixContext;
 use crate::prefix::Prefix;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) enum Context<T> {
@@ -11,15 +11,12 @@ pub(crate) enum Context<T> {
 }
 impl<T> Context<T> {
     pub fn prefix(prefix: Rc<Prefix<T>>) -> Self {
-        Context::Prefix(PrefixContext {
-            map: BTreeMap::new(),
-            prefix: prefix,
-        })
+        Context::Prefix(PrefixContext::new(prefix, Bindings::new()))
     }
     pub fn get_name(&self, key: &Name) -> Name {
         match self {
-            Context::Choice(ctx) => ctx.get_name(key),
-            Context::Prefix(ctx) => ctx.get_name(key),
+            Context::Choice(ctx) => ctx.bindings.get_name(key),
+            Context::Prefix(ctx) => ctx.bindings.get_name(key),
         }
     }
 }
