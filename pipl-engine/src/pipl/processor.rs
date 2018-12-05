@@ -1,5 +1,4 @@
 use crate::call::CallFrame;
-use crate::channel::Channel;
 use crate::name::Name;
 use crate::name::NameStore;
 use crate::pipl::context::ChoiceContext;
@@ -7,6 +6,9 @@ use crate::pipl::context::Context;
 use crate::pipl::context::PrefixContext;
 use crate::pipl::ContextStore;
 use crate::prefix::Action;
+use crate::prefix::Prefix;
+use crate::prefix::PrefixDirection;
+use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) struct Processor<'a, T: 'a> {
     contexts: &'a mut ContextStore<T>,
@@ -17,20 +19,16 @@ impl<'a, T> Processor<'a, T> {
         Processor { contexts, names }
     }
     pub fn activate(&mut self, name: Name, reader: Context<T>, sender: Context<T>) {
-        let r = reader.collapse(self.contexts, &Channel::read(name.clone()));
-        let s = sender.collapse(self.contexts, &Channel::send(name));
+        let r = self.contexts.collapse(reader, &name, PrefixDirection::Read);
+        let s = self.contexts.collapse(sender, &name, PrefixDirection::Send);
         let output = self.react(s, None);
         self.react(r, output);
     }
-    fn add(&mut self, channel: &Channel, ctx: Context<T>) {
-        let c = channel.clone_with(ctx.get_name(channel.name()));
-        self.contexts.add(&c, ctx);
-    }
-    fn add_choice(&mut self, channel: &Channel, ctx: ChoiceContext<T>) {
-        self.add(channel, Context::Choice(ctx));
+    fn add_choice(&mut self, prefix: Rc<Prefix<T>>, ctx: ChoiceContext<T>) {
+        self.contexts.add(prefix, Context::Choice(ctx));
     }
     fn add_prefix(&mut self, ctx: PrefixContext<T>) {
-        self.add(&ctx.prefix.channel().clone(), Context::Prefix(ctx));
+        self.contexts.add(ctx.prefix.clone(), Context::Prefix(ctx));
     }
     fn react(
         &mut self,
@@ -50,9 +48,9 @@ impl<'a, T> Processor<'a, T> {
             action = iter.next();
         }
         if let Some(&Action::Communicate(ref list)) = action {
-            match ctx.prefix.channel() {
-                &Channel::Read(_) => ctx.set_names(list, read_names.unwrap_or_else(Vec::new)),
-                &Channel::Send(_) => send_names = Some(ctx.get_names(list)),
+            match ctx.prefix.direction() {
+                PrefixDirection::Read => ctx.set_names(list, read_names.unwrap_or_else(Vec::new)),
+                PrefixDirection::Send => send_names = Some(ctx.get_names(list)),
             }
             action = iter.next();
         }
@@ -80,9 +78,9 @@ impl<'a, T> Processor<'a, T> {
                 let choice_ctx = ctx.choice(list.clone());
                 if let Some((last, head)) = list.split_last() {
                     for s in head.iter() {
-                        self.add_choice(s.channel(), choice_ctx.clone());
+                        self.add_choice(s.clone(), choice_ctx.clone());
                     }
-                    self.add_choice(last.channel(), choice_ctx);
+                    self.add_choice(last.clone(), choice_ctx);
                 }
             }
         }

@@ -1,9 +1,9 @@
 use crate::call::Call;
-use crate::channel::Channel;
 use crate::name::Name;
 use crate::pipl::Pipl;
 use crate::prefix::Action;
 use crate::prefix::Prefix;
+use crate::prefix::PrefixDirection;
 use std::rc::Rc;
 pub enum Builder<T> {
     Prefix(PrefixBuilder<T>),
@@ -20,18 +20,22 @@ impl<T> PiplBuilder<T> {
             sequences: Vec::new(),
         }
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
-        let b = PrefixBuilder::new(prefix_type, name.clone());
+    fn prefix<'a>(
+        &'a mut self,
+        name: &Name,
+        direction: PrefixDirection,
+    ) -> &'a mut PrefixBuilder<T> {
+        let b = PrefixBuilder::new(name.clone(), direction);
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
     pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Read, name)
+        self.prefix(name, PrefixDirection::Read)
     }
     /// start building a new sequence with a send prefix
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Send, name)
+        self.prefix(name, PrefixDirection::Send)
     }
     /// add all sequences to Pipl and remove from builder
     pub fn apply(&mut self, pipl: &mut Pipl<T>) {
@@ -40,13 +44,9 @@ impl<T> PiplBuilder<T> {
         }
     }
 }
-enum PrefixType {
-    Read,
-    Send,
-}
 pub struct PrefixBuilder<T> {
-    prefix_type: PrefixType,
     name: Name,
+    direction: PrefixDirection,
     repeating: bool,
     restricts: Vec<Name>,
     names: Vec<Name>,
@@ -54,10 +54,10 @@ pub struct PrefixBuilder<T> {
     next: Box<Builder<T>>,
 }
 impl<T> PrefixBuilder<T> {
-    fn new(prefix_type: PrefixType, name: Name) -> Self {
+    fn new(name: Name, direction: PrefixDirection) -> Self {
         PrefixBuilder {
-            prefix_type: prefix_type,
             name: name,
+            direction: direction,
             repeating: false,
             restricts: Vec::new(),
             names: Vec::new(),
@@ -85,12 +85,13 @@ impl<T> PrefixBuilder<T> {
         self.call = Some(call);
         self
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
+    fn prefix<'a>(
+        &'a mut self,
+        name: &Name,
+        direction: PrefixDirection,
+    ) -> &'a mut PrefixBuilder<T> {
         use std::borrow::BorrowMut;
-        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(
-            prefix_type,
-            name.clone(),
-        )));
+        self.next = Box::new(Builder::Prefix(PrefixBuilder::new(name.clone(), direction)));
         if let &mut Builder::Prefix(ref mut b) = self.next.borrow_mut() {
             b
         } else {
@@ -99,11 +100,11 @@ impl<T> PrefixBuilder<T> {
     }
     /// terminate prefix with a read prefix
     pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Read, name)
+        self.prefix(name, PrefixDirection::Read)
     }
     /// terminate prefix with a send prefix
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Send, name)
+        self.prefix(name, PrefixDirection::Send)
     }
     /// terminate prefix with a parallel process
     pub fn parallel<'a>(&'a mut self) -> &'a mut ParallelBuilder<T> {
@@ -127,18 +128,14 @@ impl<T> PrefixBuilder<T> {
     }
     fn build(self) -> Prefix<T> {
         let PrefixBuilder {
-            prefix_type,
             name,
+            direction,
             repeating,
             restricts,
             names,
             call,
             next,
         } = self;
-        let channel = match prefix_type {
-            PrefixType::Read => Channel::read(name),
-            PrefixType::Send => Channel::send(name),
-        };
         let mut actions = Vec::new();
         if repeating {
             actions.push(Action::Repeat);
@@ -170,7 +167,7 @@ impl<T> PrefixBuilder<T> {
             Builder::Prefix(b) => actions.push(Action::Prefix(Rc::new(b.build()))),
             Builder::Terminal => {}
         };
-        Prefix::new(channel, actions)
+        Prefix::new(name, direction, actions)
     }
 }
 pub struct ParallelBuilder<T> {
@@ -189,18 +186,22 @@ impl<T> ParallelBuilder<T> {
         self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
-        let b = PrefixBuilder::new(prefix_type, name.clone());
+    fn prefix<'a>(
+        &'a mut self,
+        name: &Name,
+        direction: PrefixDirection,
+    ) -> &'a mut PrefixBuilder<T> {
+        let b = PrefixBuilder::new(name.clone(), direction);
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
     pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Read, name)
+        self.prefix(name, PrefixDirection::Read)
     }
     /// start building a new sequence with a send prefix
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Send, name)
+        self.prefix(name, PrefixDirection::Send)
     }
     fn build(self) -> (Vec<Name>, Vec<Rc<Prefix<T>>>) {
         let ParallelBuilder {
@@ -227,18 +228,22 @@ impl<T> ChoiceBuilder<T> {
         self.restricts.extend(names.iter().map(|&x| x.clone()));
         self
     }
-    fn prefix<'a>(&'a mut self, prefix_type: PrefixType, name: &Name) -> &'a mut PrefixBuilder<T> {
-        let b = PrefixBuilder::new(prefix_type, name.clone());
+    fn prefix<'a>(
+        &'a mut self,
+        name: &Name,
+        direction: PrefixDirection,
+    ) -> &'a mut PrefixBuilder<T> {
+        let b = PrefixBuilder::new(name.clone(), direction);
         self.sequences.push(b);
         self.sequences.last_mut().unwrap()
     }
     /// start building a new sequence with a read prefix
     pub fn read<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Read, name)
+        self.prefix(name, PrefixDirection::Read)
     }
     /// start building a new sequence with a send prefix
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder<T> {
-        self.prefix(PrefixType::Send, name)
+        self.prefix(name, PrefixDirection::Send)
     }
     fn build(self) -> (Vec<Name>, Vec<Rc<Prefix<T>>>) {
         let ChoiceBuilder {

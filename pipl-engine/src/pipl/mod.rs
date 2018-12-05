@@ -1,14 +1,15 @@
 pub(crate) mod context;
 pub(crate) mod processor;
 
-use crate::channel::Channel;
 use crate::name::Name;
 use crate::name::NameStore;
 use crate::pipl::context::Context;
+use crate::pipl::context::PrefixContext;
 use crate::pipl::processor::Processor;
 use crate::prefix::Prefix;
+use crate::prefix::PrefixDirection;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl<T> {
@@ -23,9 +24,8 @@ impl<T> Pipl<T> {
         }
     }
     pub fn add(&mut self, prefix: Prefix<T>) {
-        let channel = prefix.channel().clone();
-        let context = Context::prefix(Rc::new(prefix));
-        self.contexts.add(&channel, context);
+        let p = Rc::new(prefix);
+        self.contexts.add(p.clone(), Context::prefix(p));
     }
     pub fn dup_name(&mut self, name: &Name) -> Name {
         self.names.dup_name(name)
@@ -44,94 +44,122 @@ impl<T> Pipl<T> {
 }
 #[derive(Debug)]
 pub(crate) struct ContextStore<T> {
-    map: HashMap<Channel, ContextQueue<T>>,
-    queue: ReadyQueue,
+    set: ContextSet<T>,
+    ready: ReadySet,
 }
 impl<T> ContextStore<T> {
     fn new() -> Self {
         ContextStore {
-            map: HashMap::new(),
-            queue: ReadyQueue::new(),
+            set: ContextSet::new(),
+            ready: ReadySet::new(),
         }
     }
-    fn add(&mut self, channel: &Channel, context: Context<T>) {
-        self.map
-            .entry(channel.clone())
-            .or_insert(ContextQueue::new())
-            .add(context);
-        if let Some(q) = self.map.get(&channel.invert()) {
-            if q.is_ready() {
-                self.queue.add(channel.name().clone());
+    fn add(&mut self, prefix: Rc<Prefix<T>>, context: Context<T>) {
+        let name = context.get_name(prefix.name());
+        self.set.add(name.clone(), prefix.direction(), context);
+        if self.set.is_waiting(&name) {
+            self.ready.add(name);
+        }
+    }
+    fn collapse(
+        &mut self,
+        context: Context<T>,
+        name: &Name,
+        direction: PrefixDirection,
+    ) -> PrefixContext<T> {
+        match context {
+            Context::Choice(ctx) => {
+                let mut r = None;
+                for p in ctx.prefixes.iter() {
+                    let n = ctx.get_name(p.name());
+                    if r.is_none() && *name == n && direction == p.direction() {
+                        r = Some(p);
+                    } else {
+                        self.set.remove(&n, p.direction(), &*ctx.map);
+                    }
+                }
+                PrefixContext {
+                    map: Rc::try_unwrap(ctx.map).unwrap(),
+                    prefix: r.unwrap().clone(),
+                }
             }
+            Context::Prefix(ctx) => ctx,
         }
-    }
-    fn dequeue(&mut self, channel: &Channel) -> Context<T> {
-        self.map.get_mut(channel).unwrap().next()
     }
     fn next(&mut self) -> Option<(Name, Context<T>, Context<T>)> {
-        if let Some(name) = self.queue.next() {
-            let read = &Channel::Read(name.clone());
-            let send = &Channel::Send(name.clone());
-            if self.still_ready(read, send) {
-                Some((name, self.dequeue(read), self.dequeue(send)))
-            } else {
-                self.next()
-            }
+        if let Some(name) = self.ready.next() {
+            let (read, send) = self.set.next(&name);
+            Some((name, read, send))
         } else {
             None
         }
     }
-    fn remove(&mut self, channel: &Channel, refs: &BTreeMap<Name, Name>) {
-        if let Some(queue) = self.map.get_mut(channel) {
-            queue.remove(refs);
-        }
-    }
-    fn still_ready(&self, read: &Channel, send: &Channel) -> bool {
-        match (self.map.get(read), self.map.get(send)) {
-            (Some(read_q), Some(send_q)) => read_q.is_ready() && send_q.is_ready(),
-            _ => false,
-        }
-    }
 }
-#[derive(Debug)]
-struct ContextQueue<T>(Vec<Context<T>>);
-impl<T> ContextQueue<T> {
+#[derive(Debug, Default)]
+struct ContextSet<T> {
+    set: BTreeMap<Name, (Vec<Context<T>>, Vec<Context<T>>)>,
+}
+impl<T> ContextSet<T> {
     fn new() -> Self {
-        ContextQueue(Vec::new())
+        ContextSet {
+            set: BTreeMap::new(),
+        }
     }
-    fn add(&mut self, context: Context<T>) {
-        self.0.push(context);
+    fn add(&mut self, name: Name, direction: PrefixDirection, context: Context<T>) {
+        let (reads, sends) = self
+            .set
+            .entry(name)
+            .or_insert_with(|| (Vec::new(), Vec::new()));
+        let queue = match direction {
+            PrefixDirection::Read => reads,
+            PrefixDirection::Send => sends,
+        };
+        queue.push(context);
     }
-    fn is_ready(&self) -> bool {
-        self.0.len() > 0
+    fn is_waiting(&self, name: &Name) -> bool {
+        if let Some(x) = self.set.get(name) {
+            !x.0.is_empty() && !x.1.is_empty()
+        } else {
+            false
+        }
     }
-    fn next(&mut self) -> Context<T> {
-        self.0.remove(0)
+    fn next(&mut self, name: &Name) -> (Context<T>, Context<T>) {
+        let mut x = self.set.remove(name).unwrap();
+        (x.0.remove(0), x.1.remove(0))
     }
-    fn remove(&mut self, refs: &BTreeMap<Name, Name>) {
-        if let Some(i) = self.0.iter().position(|x| {
-            if let Context::Choice(ctx) = x {
-                ::std::ptr::eq(&*ctx.map, refs)
-            } else {
-                false
+    fn remove(&mut self, name: &Name, direction: PrefixDirection, refs: &BTreeMap<Name, Name>) {
+        if let Some((reads, sends)) = self.set.get_mut(name) {
+            let queue = match direction {
+                PrefixDirection::Read => reads,
+                PrefixDirection::Send => sends,
+            };
+            if let Some(i) = queue.iter().position(|x| match x {
+                Context::Choice(ctx) => ::std::ptr::eq(&*ctx.map, refs),
+                _ => false,
+            }) {
+                queue.remove(i);
             }
-        }) {
-            self.0.remove(i);
         }
     }
 }
-#[derive(Debug)]
-struct ReadyQueue(Vec<Name>);
-impl ReadyQueue {
+#[derive(Debug, Default)]
+struct ReadySet {
+    set: BTreeSet<Name>,
+}
+impl ReadySet {
     fn new() -> Self {
-        ReadyQueue(Vec::new())
+        ReadySet {
+            set: BTreeSet::new(),
+        }
     }
     fn add(&mut self, name: Name) {
-        self.0.push(name);
+        self.set.insert(name);
     }
     fn next(&mut self) -> Option<Name> {
-        if self.0.len() > 0 {
-            Some(self.0.remove(0))
+        let maybe = self.set.iter().next().cloned();
+        if let Some(name) = maybe {
+            self.set.remove(&name);
+            Some(name)
         } else {
             None
         }
