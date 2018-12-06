@@ -62,12 +62,12 @@ impl ResultsCall {
         }
     }
 }
-impl Call<N> for ResultsCall {
-    fn call(&self, frame: CallFrame<N>) {
+impl Call for ResultsCall {
+    fn call(&self, frame: CallFrame) {
         self.results.log(self.key.clone(), frame.clone_refs());
     }
 }
-pub fn log<K: Into<String>>(key: K, results: &Rc<Results>) -> Rc<Call<N>> {
+pub fn log<K: Into<String>>(key: K, results: &Rc<Results>) -> Rc<Call> {
     Rc::new(ResultsCall::new(key, results.clone()))
 }
 fn diff<'a, T: Eq + Hash>(
@@ -78,7 +78,7 @@ fn diff<'a, T: Eq + Hash>(
     let diff_right = right.difference(&left).collect::<HashSet<_>>();
     (diff_left, diff_right)
 }
-pub fn assert_eq_results(pipl: &Pipl<N>, left: &Rc<Results>, right: &Rc<Results>) {
+pub fn assert_eq_results(pipl: &Pipl, left: &Rc<Results>, right: &Rc<Results>) {
     let keys_left = left.0.borrow().keys().cloned().collect::<HashSet<_>>();
     let keys_right = right.0.borrow().keys().cloned().collect::<HashSet<_>>();
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
@@ -87,25 +87,26 @@ pub fn assert_eq_results(pipl: &Pipl<N>, left: &Rc<Results>, right: &Rc<Results>
         assert_eq_refs_list(pipl, left.get(key), right.get(key), key);
     }
 }
-fn assert_eq_refs_list(pipl: &Pipl<N>, left: Vec<Refs>, right: Vec<Refs>, key: &String) {
+fn assert_eq_refs_list(pipl: &Pipl, left: Vec<Refs>, right: Vec<Refs>, key: &String) {
     for (i, (l, r)) in left.iter().zip(right.iter()).enumerate() {
         assert_eq_refs(pipl, l, r, key, i);
     }
     assert_eq!(left.len(), right.len(), "results[{:?}].len()", key);
 }
-fn assert_eq_refs(pipl: &Pipl<N>, left: &Refs, right: &Refs, key: &String, i: usize) {
+fn assert_eq_refs(pipl: &Pipl, left: &Refs, right: &Refs, key: &String, i: usize) {
     let keys_left = left.keys().collect::<HashSet<_>>();
     let keys_right = right.keys().collect::<HashSet<_>>();
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
     assert_eq!(diff_left, diff_right, "results[{:?}][{:?}].keys()", key, i);
     for k in keys_left.iter() {
-        let left_value = pipl.get_value(&left.get(k).unwrap());
-        let right_value = pipl.get_value(&right.get(k).unwrap());
+        let left_value = pipl.get_value::<N>(&left.get(k).unwrap());
+        let right_value = pipl.get_value::<N>(&right.get(k).unwrap());
         assert_eq!(
             left_value, right_value,
             "results[{:?}][{:?}][{:?}]",
             key, i, k
         );
+        assert!(left_value.is_some());
     }
 }
 pub fn assert_ne_names(left: &Name, right: &Name) {

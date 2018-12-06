@@ -1,3 +1,4 @@
+use crate::bindings::Bindings;
 use crate::call::CallFrame;
 use crate::name::Name;
 use crate::name::NameStore;
@@ -10,29 +11,29 @@ use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
 use std::rc::Rc;
 #[derive(Debug)]
-pub(crate) struct Processor<'a, T: 'a> {
-    contexts: &'a mut ContextStore<T>,
-    names: &'a mut NameStore<T>,
+pub(crate) struct Processor<'a> {
+    contexts: &'a mut ContextStore,
+    names: &'a mut NameStore,
 }
-impl<'a, T> Processor<'a, T> {
-    pub fn new(contexts: &'a mut ContextStore<T>, names: &'a mut NameStore<T>) -> Self {
+impl<'a> Processor<'a> {
+    pub fn new(contexts: &'a mut ContextStore, names: &'a mut NameStore) -> Self {
         Processor { contexts, names }
     }
-    pub fn activate(&mut self, name: Name, reader: Context<T>, sender: Context<T>) {
+    pub fn activate(&mut self, name: Name, reader: Context, sender: Context) {
         let r = self.contexts.collapse(reader, &name, PrefixDirection::Read);
         let s = self.contexts.collapse(sender, &name, PrefixDirection::Send);
         let output = self.react(s, None);
         self.react(r, output);
     }
-    fn add_choice(&mut self, prefix: Rc<Prefix<T>>, ctx: ChoiceContext<T>) {
+    fn add_choice(&mut self, prefix: Rc<Prefix>, ctx: ChoiceContext) {
         self.contexts.add(prefix, Context::Choice(ctx));
     }
-    fn add_prefix(&mut self, ctx: PrefixContext<T>) {
+    fn add_prefix(&mut self, ctx: PrefixContext) {
         self.contexts.add(ctx.prefix.clone(), Context::Prefix(ctx));
     }
     fn react(
         &mut self,
-        mut ctx: PrefixContext<T>,
+        mut ctx: PrefixContext,
         read_names: Option<Vec<Name>>,
     ) -> Option<Vec<Name>> {
         let mut send_names = None;
@@ -44,7 +45,7 @@ impl<'a, T> Processor<'a, T> {
             action = iter.next();
         }
         if let Some(&Action::Restrict(ref list)) = action {
-            ctx.bindings.new_names(self.names, list);
+            restrict(&mut ctx.bindings, self.names, list);
             action = iter.next();
         }
         if let Some(&Action::Communicate(ref list)) = action {
@@ -65,7 +66,7 @@ impl<'a, T> Processor<'a, T> {
             self.add_prefix(ctx);
         } else {
             if let Some(&Action::Restrict(ref list)) = action {
-                ctx.bindings.new_names(self.names, list);
+                restrict(&mut ctx.bindings, self.names, list);
                 action = iter.next();
             }
             if let Some(&Action::Parallel(ref list)) = action {
@@ -87,5 +88,10 @@ impl<'a, T> Processor<'a, T> {
             }
         }
         send_names
+    }
+}
+fn restrict(bindings: &mut Bindings, names: &mut NameStore, new_names: &Vec<Name>) {
+    for name in new_names.iter() {
+        bindings.set_name(name.clone(), names.dup_name(name));
     }
 }

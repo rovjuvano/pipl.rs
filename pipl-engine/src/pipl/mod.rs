@@ -9,32 +9,34 @@ use crate::pipl::context::PrefixContext;
 use crate::pipl::processor::Processor;
 use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt;
 use std::rc::Rc;
 #[derive(Debug)]
-pub struct Pipl<T> {
-    contexts: ContextStore<T>,
-    names: NameStore<T>,
+pub struct Pipl {
+    contexts: ContextStore,
+    names: NameStore,
 }
-impl<T> Pipl<T> {
+impl Pipl {
     pub fn new() -> Self {
         Pipl {
             contexts: ContextStore::new(),
             names: NameStore::new(),
         }
     }
-    pub fn add(&mut self, prefix: Prefix<T>) {
+    pub fn add(&mut self, prefix: Prefix) {
         let p = Rc::new(prefix);
         self.contexts.add(p.clone(), Context::prefix(p));
     }
     pub fn dup_name(&mut self, name: &Name) -> Name {
         self.names.dup_name(name)
     }
-    pub fn get_value(&self, name: &Name) -> Option<&T> {
+    pub fn get_value<T: Any + fmt::Debug>(&self, name: &Name) -> Option<&T> {
         self.names.get_value(name)
     }
-    pub fn new_name(&mut self, data: T) -> Name {
+    pub fn new_name<T: Any + fmt::Debug>(&mut self, data: T) -> Name {
         self.names.new_name(data)
     }
     pub fn step(&mut self) {
@@ -44,18 +46,18 @@ impl<T> Pipl<T> {
     }
 }
 #[derive(Debug)]
-pub(crate) struct ContextStore<T> {
-    set: ContextSet<T>,
+pub(crate) struct ContextStore {
+    set: ContextSet,
     ready: ReadySet,
 }
-impl<T> ContextStore<T> {
+impl ContextStore {
     fn new() -> Self {
         ContextStore {
             set: ContextSet::new(),
             ready: ReadySet::new(),
         }
     }
-    fn add(&mut self, prefix: Rc<Prefix<T>>, context: Context<T>) {
+    fn add(&mut self, prefix: Rc<Prefix>, context: Context) {
         let name = context.get_name(prefix.name());
         self.set.add(name.clone(), prefix.direction(), context);
         if self.set.is_waiting(&name) {
@@ -64,10 +66,10 @@ impl<T> ContextStore<T> {
     }
     fn collapse(
         &mut self,
-        context: Context<T>,
+        context: Context,
         name: &Name,
         direction: PrefixDirection,
-    ) -> PrefixContext<T> {
+    ) -> PrefixContext {
         match context {
             Context::Choice(ctx) => {
                 let mut r = None;
@@ -84,7 +86,7 @@ impl<T> ContextStore<T> {
             Context::Prefix(ctx) => ctx,
         }
     }
-    fn next(&mut self) -> Option<(Name, Context<T>, Context<T>)> {
+    fn next(&mut self) -> Option<(Name, Context, Context)> {
         if let Some(name) = self.ready.next() {
             let (read, send) = self.set.next(&name);
             Some((name, read, send))
@@ -94,16 +96,16 @@ impl<T> ContextStore<T> {
     }
 }
 #[derive(Debug, Default)]
-struct ContextSet<T> {
-    set: BTreeMap<Name, (Vec<Context<T>>, Vec<Context<T>>)>,
+struct ContextSet {
+    set: BTreeMap<Name, (Vec<Context>, Vec<Context>)>,
 }
-impl<T> ContextSet<T> {
+impl ContextSet {
     fn new() -> Self {
         ContextSet {
             set: BTreeMap::new(),
         }
     }
-    fn add(&mut self, name: Name, direction: PrefixDirection, context: Context<T>) {
+    fn add(&mut self, name: Name, direction: PrefixDirection, context: Context) {
         let (reads, sends) = self
             .set
             .entry(name)
@@ -115,15 +117,15 @@ impl<T> ContextSet<T> {
         queue.push(context);
     }
     fn is_waiting(&self, name: &Name) -> bool {
-        if let Some(x) = self.set.get(name) {
-            !x.0.is_empty() && !x.1.is_empty()
+        if let Some((reads, sends)) = self.set.get(name) {
+            !reads.is_empty() && !sends.is_empty()
         } else {
             false
         }
     }
-    fn next(&mut self, name: &Name) -> (Context<T>, Context<T>) {
-        let mut x = self.set.remove(name).unwrap();
-        (x.0.remove(0), x.1.remove(0))
+    fn next(&mut self, name: &Name) -> (Context, Context) {
+        let (mut reads, mut sends) = self.set.remove(name).unwrap();
+        (reads.remove(0), sends.remove(0))
     }
     fn remove(&mut self, name: &Name, direction: PrefixDirection, bindings: &Bindings) {
         if let Some((reads, sends)) = self.set.get_mut(name) {

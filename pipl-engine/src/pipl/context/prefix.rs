@@ -3,28 +3,28 @@ use crate::pipl::context::ChoiceContext;
 use crate::prefix::Prefix;
 use std::rc::Rc;
 #[derive(Debug)]
-pub(crate) struct PrefixContext<T> {
+pub(crate) struct PrefixContext {
     pub bindings: Bindings,
-    pub prefix: Rc<Prefix<T>>,
+    pub prefix: Rc<Prefix>,
 }
-impl<T> PrefixContext<T> {
-    pub fn new(prefix: Rc<Prefix<T>>, bindings: Bindings) -> Self {
+impl PrefixContext {
+    pub fn new(prefix: Rc<Prefix>, bindings: Bindings) -> Self {
         PrefixContext { bindings, prefix }
     }
-    pub fn choice(self, prefixes: Vec<Rc<Prefix<T>>>) -> ChoiceContext<T> {
+    pub fn choice(self, prefixes: Vec<Rc<Prefix>>) -> ChoiceContext {
         ChoiceContext {
             bindings: Rc::new(self.bindings),
             prefixes: Rc::new(prefixes),
         }
     }
-    pub fn clone_with(&self, prefix: Rc<Prefix<T>>) -> Self {
+    pub fn clone_with(&self, prefix: Rc<Prefix>) -> Self {
         PrefixContext {
             bindings: self.bindings.clone(),
             prefix,
         }
     }
 }
-impl<T> Clone for PrefixContext<T> {
+impl Clone for PrefixContext {
     fn clone(&self) -> Self {
         PrefixContext {
             bindings: self.bindings.clone(),

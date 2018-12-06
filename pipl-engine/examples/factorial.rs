@@ -17,8 +17,8 @@ impl fmt::Display for N {
     }
 }
 fn add_factorial(
-    pipl: &mut Pipl<N>,
-    builder: &mut PiplBuilder<N>,
+    pipl: &mut Pipl,
+    builder: &mut PiplBuilder,
     greater_than: &Name,
     subtract: &Name,
     multiply: &Name,
@@ -56,12 +56,12 @@ fn add_factorial(
         .send(out).names(&[result]);
     fact
 }
-fn add_print(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
+fn add_print(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
     #[derive(Debug)]
     struct PrintCall(Name);
-    impl Call<N> for PrintCall {
-        fn call(&self, frame: CallFrame<N>) {
-            println!("{}", frame.get_value(&self.0).unwrap());
+    impl Call for PrintCall {
+        fn call(&self, frame: CallFrame) {
+            println!("{}", frame.get_value::<N>(&self.0).unwrap());
         }
     }
     let name = pipl.new_name(N::Str("print"));
@@ -73,7 +73,7 @@ fn add_print(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
         .call(Rc::new(PrintCall(arg)));
     name
 }
-fn add_greater_than(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
+fn add_greater_than(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
     #[derive(Debug)]
     struct GreaterThanCall {
         a: Name,
@@ -82,8 +82,8 @@ fn add_greater_than(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
         lte: Name,
         out: Name,
     }
-    impl Call<N> for GreaterThanCall {
-        fn call(&self, mut frame: CallFrame<N>) {
+    impl Call for GreaterThanCall {
+        fn call(&self, mut frame: CallFrame) {
             let maybe = match (frame.get_value(&self.a), frame.get_value(&self.b)) {
                 (Some(N::Usize(a)), Some(N::Usize(b))) => {
                     let x = if a > b { &self.gt } else { &self.lte };
@@ -133,8 +133,8 @@ impl fmt::Debug for BinaryOpCall {
             .finish()
     }
 }
-impl Call<N> for BinaryOpCall {
-    fn call(&self, mut frame: CallFrame<N>) {
+impl Call for BinaryOpCall {
+    fn call(&self, mut frame: CallFrame) {
         let maybe = match (frame.get_value(&self.a), frame.get_value(&self.b)) {
             (Some(N::Usize(a)), Some(N::Usize(b))) => Some((self.f)(*a, *b)),
             _ => None,
@@ -146,8 +146,8 @@ impl Call<N> for BinaryOpCall {
     }
 }
 fn add_binary_op<T>(
-    pipl: &mut Pipl<N>,
-    builder: &mut PiplBuilder<N>,
+    pipl: &mut Pipl,
+    builder: &mut PiplBuilder,
     label: &'static str,
     f: T,
 ) -> Name
@@ -172,10 +172,10 @@ where
         .send(out).names(&[&result]);
     name
 }
-fn add_subtract(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
+fn add_subtract(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
     add_binary_op(pipl, builder, "-", |a, b| a - b)
 }
-fn add_multiply(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>) -> Name {
+fn add_multiply(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
     add_binary_op(pipl, builder, "*", |a, b| a * b)
 }
 fn main() {

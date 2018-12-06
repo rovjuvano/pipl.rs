@@ -12,18 +12,18 @@ impl EchoCall {
         EchoCall { name: name }
     }
 }
-impl Call<N> for EchoCall {
-    fn call(&self, frame: CallFrame<N>) {
-        println!("{}", frame.get_value(&self.name).unwrap());
+impl Call for EchoCall {
+    fn call(&self, frame: CallFrame) {
+        println!("{}", frame.get_value::<N>(&self.name).unwrap());
     }
 }
-fn make_read(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>, echo: &Name) {
+fn make_read(pipl: &mut Pipl, builder: &mut PiplBuilder, echo: &Name) {
     let arg = pipl.new_name("".to_owned());
     builder
         .read(echo).names(&[&arg]).repeat()
         .call(Rc::new(EchoCall::new(arg)));
 }
-fn make_send(pipl: &mut Pipl<N>, builder: &mut PiplBuilder<N>, echo: &Name, arg: String) {
+fn make_send(pipl: &mut Pipl, builder: &mut PiplBuilder, echo: &Name, arg: String) {
     let name = pipl.new_name(arg);
     builder.send(echo).names(&[&name]);
 }

@@ -5,12 +5,12 @@ use crate::pipl::context::PrefixContext;
 use crate::prefix::Prefix;
 use std::rc::Rc;
 #[derive(Debug)]
-pub(crate) enum Context<T> {
-    Choice(ChoiceContext<T>),
-    Prefix(PrefixContext<T>),
+pub(crate) enum Context {
+    Choice(ChoiceContext),
+    Prefix(PrefixContext),
 }
-impl<T> Context<T> {
-    pub fn prefix(prefix: Rc<Prefix<T>>) -> Self {
+impl Context {
+    pub fn prefix(prefix: Rc<Prefix>) -> Self {
         Context::Prefix(PrefixContext::new(prefix, Bindings::new()))
     }
     pub fn get_name(&self, key: &Name) -> Name {

@@ -1,5 +1,6 @@
+use std::any::Any;
 use std::fmt;
-#[derive(Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Name {
     slot_id: usize,
     version: usize,
@@ -14,41 +15,57 @@ impl fmt::Debug for Name {
         write!(f, "Name({:?}, {:?})", self.slot_id, self.version)
     }
 }
-pub struct NameStore<T> {
-    values: Vec<T>,
-    versions: Vec<usize>,
+trait AsAnyDebug: Any + fmt::Debug {
+    fn as_any(&self) -> &dyn Any;
 }
-impl<T> NameStore<T> {
-    pub(crate) fn new() -> Self {
-        NameStore {
-            values: Vec::new(),
-            versions: Vec::new(),
+impl<T: Any + fmt::Debug> AsAnyDebug for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+#[derive(Debug)]
+struct Item {
+    data: Box<dyn AsAnyDebug>,
+    version: usize,
+}
+impl Item {
+    fn new(data: impl AsAnyDebug) -> Self {
+        Item {
+            data: Box::new(data),
+            version: 0,
         }
     }
+}
+pub struct NameStore {
+    values: Vec<Item>,
+}
+impl NameStore {
+    pub(crate) fn new() -> Self {
+        NameStore { values: Vec::new() }
+    }
     pub fn dup_name(&mut self, name: &Name) -> Name {
-        let version = self.versions.get_mut(name.slot_id).unwrap();
-        *version += 1;
-        Name::new(name.slot_id, *version)
+        let item = self.values.get_mut(name.slot_id).unwrap();
+        item.version += 1;
+        Name::new(name.slot_id, item.version)
     }
-    pub fn get_value(&self, name: &Name) -> Option<&T> {
-        self.values.get(name.slot_id)
+    pub fn get_value<T: Any + fmt::Debug>(&self, name: &Name) -> Option<&T> {
+        let item = self.values.get(name.slot_id).unwrap();
+        Any::downcast_ref::<T>((*item.data).as_any())
     }
-    pub fn new_name(&mut self, data: T) -> Name {
+    pub fn new_name<T: Any + fmt::Debug>(&mut self, data: T) -> Name {
         let name = Name::new(self.values.len(), 0);
-        self.values.push(data);
-        self.versions.push(0);
+        self.values.push(Item::new(data));
         name
     }
 }
-impl<T: fmt::Debug> fmt::Debug for NameStore<T> {
+impl fmt::Debug for NameStore {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let names = self
             .values
             .iter()
-            .zip(self.versions.iter())
             .enumerate()
-            .map(|(i, (x, v))| format!("{} [{}]: {:?}", i, v, x))
-            .collect::<Vec<String>>();
+            .map(|(i, x)| format!("{}.{}: {:?}", i, x.version, x.data))
+            .collect::<Vec<_>>();
         if f.alternate() {
             write!(f, "{:#?}", names)
         } else {

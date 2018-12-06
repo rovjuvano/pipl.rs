@@ -2,14 +2,14 @@ use crate::call::Call;
 use crate::name::Name;
 use std::rc::Rc;
 #[derive(Debug)]
-pub enum Action<T> {
+pub enum Action {
     Repeat,
     Restrict(Vec<Name>),
     Communicate(Vec<Name>),
-    Call(Rc<dyn Call<T>>),
-    Prefix(Rc<Prefix<T>>),
-    Parallel(Vec<Rc<Prefix<T>>>),
-    Choice(Vec<Rc<Prefix<T>>>),
+    Call(Rc<dyn Call>),
+    Prefix(Rc<Prefix>),
+    Parallel(Vec<Rc<Prefix>>),
+    Choice(Vec<Rc<Prefix>>),
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrefixDirection {
@@ -17,13 +17,13 @@ pub enum PrefixDirection {
     Send,
 }
 #[derive(Debug)]
-pub struct Prefix<T> {
-    actions: Vec<Action<T>>,
+pub struct Prefix {
+    actions: Vec<Action>,
     direction: PrefixDirection,
     name: Name,
 }
-impl<T> Prefix<T> {
-    pub fn new(name: Name, direction: PrefixDirection, actions: Vec<Action<T>>) -> Self {
+impl Prefix {
+    pub fn new(name: Name, direction: PrefixDirection, actions: Vec<Action>) -> Self {
         Prefix {
             actions,
             direction,
@@ -31,7 +31,7 @@ impl<T> Prefix<T> {
         }
     }
     #[inline]
-    pub fn actions(&self) -> &Vec<Action<T>> {
+    pub fn actions(&self) -> &Vec<Action> {
         &self.actions
     }
     #[inline]
