@@ -4,7 +4,7 @@ fn no_names() {
     // w[].x().() w(a).x[b].()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x a b });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .read(w).call(log("w[]", actual))
@@ -13,7 +13,7 @@ fn no_names() {
         .send(w).names(&[a]).call(log("w(a)", actual))
         .read(x).names(&[b]).call(log("x[b]", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_empty = Refs::new();
     expected.log("w[]", refs_empty.clone());
     expected.log("x()", refs_empty.clone());

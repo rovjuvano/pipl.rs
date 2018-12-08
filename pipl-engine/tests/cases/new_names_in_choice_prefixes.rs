@@ -6,7 +6,7 @@ fn new_names_in_choice_prefixes() {
     // m[z].() n(c).() o(d).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y z a b c d m n o p });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     {
         let choice = builder
@@ -33,7 +33,7 @@ fn new_names_in_choice_prefixes() {
     builder
         .send(o).names(&[d]).call(log("o(d)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     refs_wx.insert(x.clone(), a.clone());

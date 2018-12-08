@@ -4,7 +4,7 @@ fn new_names_in_parallel_prefixes() {
     // w[x].(| [x]w(x).x(b).() [a]w[y].a(c).() x[z].() ) w(a).a[z].()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y z a b c });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     {
         let parallel = builder
@@ -23,7 +23,7 @@ fn new_names_in_parallel_prefixes() {
         .send(w).names(&[a]).call(log("w(a)", actual))
         .read(a).names(&[z]).call(log("a[z]", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     refs_wx.insert(x.clone(), a.clone());

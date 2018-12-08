@@ -5,7 +5,7 @@ fn new_names_before_parallel() {
     // w(a).w[m].() a[n].() x[o].() y(b).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c m n o p });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     {
         let parallel = builder
@@ -31,7 +31,7 @@ fn new_names_before_parallel() {
     builder
         .send(y).names(&[b]).call(log("y(b)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     let refs_yb = &mut Refs::new();

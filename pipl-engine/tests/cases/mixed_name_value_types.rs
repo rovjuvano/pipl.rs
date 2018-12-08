@@ -7,7 +7,7 @@ fn mixed_name_value_types() {
     let x = &pipl.new_name(N::Char('x'));
     let y = &pipl.new_name(N::I32(121));
     let z = &pipl.new_name(N::VecStr(vec!["z"]));
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .send(w).names(&[x]).call(log("w(x)", actual))
@@ -16,7 +16,7 @@ fn mixed_name_value_types() {
         .read(w).names(&[z]).call(log("w[z]", actual))
         .send(z).names(&[z]).call(log("z(z)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wz = &mut Refs::new();
     refs_wz.insert(z.clone(), x.clone());

@@ -4,7 +4,7 @@ fn new_names_in_read() {
     // w[x].y(w).a(b).x(c).() w(a).[w, x]y[m].a[n].x[o].()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c m n o });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .read(w).names(&[x]).call(log("w[x]", actual))
@@ -17,7 +17,7 @@ fn new_names_in_read() {
         .read(a).names(&[n]).call(log("a[n]", actual))
         .read(x).names(&[o]).call(log("x[o]", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     refs_wx.insert(x.clone(), a.clone());

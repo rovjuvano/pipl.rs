@@ -1,7 +1,6 @@
 extern crate pipl_engine;
 use pipl_engine::{Call, CallFrame, Name, Pipl, PiplBuilder};
 use std::env;
-use std::rc::Rc;
 type N = String;
 #[derive(Debug)]
 struct EchoCall {
@@ -21,7 +20,7 @@ fn make_read(pipl: &mut Pipl, builder: &mut PiplBuilder, echo: &Name) {
     let arg = pipl.new_name("".to_owned());
     builder
         .read(echo).names(&[&arg]).repeat()
-        .call(Rc::new(EchoCall::new(arg)));
+        .call(EchoCall::new(arg));
 }
 fn make_send(pipl: &mut Pipl, builder: &mut PiplBuilder, echo: &Name, arg: String) {
     let name = pipl.new_name(arg);

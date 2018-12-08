@@ -28,20 +28,26 @@ pub enum N {
 }
 pub type Refs = BTreeMap<Name, Name>;
 #[derive(Debug, Eq, PartialEq)]
-pub struct Results(RefCell<HashMap<String, Vec<Refs>>>);
+pub struct InnerResults(RefCell<HashMap<String, Vec<Refs>>>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Results {
+    inner: Rc<InnerResults>,
+}
 impl Results {
     pub fn new() -> Self {
-        Results(RefCell::new(HashMap::new()))
+        Results {
+            inner: Rc::new(InnerResults(RefCell::new(HashMap::new())))
+        }
     }
     pub fn log<K: Into<String>>(&self, key: K, refs: Refs) {
-        self.0
+        self.inner.0
             .borrow_mut()
             .entry(key.into())
             .or_insert(Vec::new())
             .push(refs);
     }
     pub fn get(&self, key: &str) -> Vec<Refs> {
-        self.0
+        self.inner.0
             .borrow()
             .get(key)
             .or(Some(&Vec::with_capacity(0)))
@@ -52,10 +58,10 @@ impl Results {
 #[derive(Debug)]
 struct ResultsCall {
     key: String,
-    results: Rc<Results>,
+    results: Results,
 }
 impl ResultsCall {
-    pub fn new<K: Into<String>>(key: K, results: Rc<Results>) -> Self {
+    pub fn new<K: Into<String>>(key: K, results: Results) -> Self {
         ResultsCall {
             key: key.into(),
             results: results,
@@ -67,8 +73,8 @@ impl Call for ResultsCall {
         self.results.log(self.key.clone(), frame.clone_refs());
     }
 }
-pub fn log<K: Into<String>>(key: K, results: &Rc<Results>) -> Rc<Call> {
-    Rc::new(ResultsCall::new(key, results.clone()))
+pub fn log<K: Into<String>>(key: K, results: &Results) -> impl Call {
+    ResultsCall::new(key, results.clone())
 }
 fn diff<'a, T: Eq + Hash>(
     left: &'a HashSet<T>,
@@ -78,9 +84,9 @@ fn diff<'a, T: Eq + Hash>(
     let diff_right = right.difference(&left).collect::<HashSet<_>>();
     (diff_left, diff_right)
 }
-pub fn assert_eq_results(pipl: &Pipl, left: &Rc<Results>, right: &Rc<Results>) {
-    let keys_left = left.0.borrow().keys().cloned().collect::<HashSet<_>>();
-    let keys_right = right.0.borrow().keys().cloned().collect::<HashSet<_>>();
+pub fn assert_eq_results(pipl: &Pipl, left: &Results, right: &Results) {
+    let keys_left = left.inner.0.borrow().keys().cloned().collect::<HashSet<_>>();
+    let keys_right = right.inner.0.borrow().keys().cloned().collect::<HashSet<_>>();
     let (diff_left, diff_right) = diff(&keys_left, &keys_right);
     assert_eq!(diff_left, diff_right, "results.keys()");
     for ref key in keys_left.iter() {

@@ -4,7 +4,7 @@ fn terminate_parallel() {
     // w[x].(| x[y].() y[z].y[z].() ) w(a).a(b).y(c).() b(d).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y z a b c d });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     {
         let parallel = builder.read(w).names(&[x]).call(log("w[x]", actual)).parallel();
@@ -20,7 +20,7 @@ fn terminate_parallel() {
         .send(y).names(&[c]).call(log("y(c)", actual));
     builder.send(b).names(&[d]).call(log("b(d)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_empty = Refs::new();
     let refs_wx = &mut Refs::new();
     refs_wx.insert(x.clone(), a.clone());

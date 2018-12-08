@@ -4,7 +4,7 @@ fn repeating_send_prefix() {
     // w[a].a[c].w[b].b[c].a[d].b[e].() !w(x).!x(y).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c d e });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .read(w).names(&[a]).call(log("w[a]", actual))
@@ -17,7 +17,7 @@ fn repeating_send_prefix() {
         .send(w).names(&[x]).repeat().call(log("!w(x)", actual))
         .send(x).names(&[y]).repeat().call(log("!x(y)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_empty = Refs::new();
     let refs_wa = &mut Refs::new();
     // w[a].a[c] !w(x).!x(y)

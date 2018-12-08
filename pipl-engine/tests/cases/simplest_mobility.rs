@@ -4,7 +4,7 @@ fn simplest_mobility() {
     // w(x).x[y].() w[z].z(z).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y z });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .send(w).names(&[x]).call(log("w(x)", actual))
@@ -13,7 +13,7 @@ fn simplest_mobility() {
         .read(w).names(&[z]).call(log("w[z]", actual))
         .send(z).names(&[z]).call(log("z(z)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wz = &mut Refs::new();
     refs_wz.insert(z.clone(), x.clone());

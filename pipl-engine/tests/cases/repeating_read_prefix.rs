@@ -4,7 +4,7 @@ fn repeating_read_prefix() {
     // w(a).a(c).w(b).b(c).a(d).b(e).() !w[x].!x[y].()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c d e });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .send(w).names(&[a]).call(log("w(a)", actual))
@@ -17,7 +17,7 @@ fn repeating_read_prefix() {
         .read(w).names(&[x]).repeat().call(log("!w[x]", actual))
         .read(x).names(&[y]).repeat().call(log("!x[y]", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_empty = &mut Refs::new();
     let refs_wx1 = &mut Refs::new();
     let refs_wx2 = &mut Refs::new();

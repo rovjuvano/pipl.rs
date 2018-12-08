@@ -10,7 +10,6 @@ use std::any::Any;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
-use std::rc::Rc;
 #[derive(Debug)]
 pub struct Pipl {
     contexts: ContextStore,
@@ -24,7 +23,7 @@ impl Pipl {
         }
     }
     pub fn add(&mut self, prefix: Prefix) {
-        self.contexts.add_prefix(Bindings::new(), Rc::new(prefix));
+        self.contexts.add_prefix(Bindings::new(), prefix);
     }
     pub fn dup_name(&mut self, name: &Name) -> Name {
         self.names.dup_name(name)
@@ -53,12 +52,12 @@ enum Context {
 #[derive(Debug)]
 struct ChoiceContext {
     bindings: Bindings,
-    prefixes: Vec<Rc<Prefix>>,
+    prefixes: Vec<Prefix>,
 }
 #[derive(Debug)]
 struct PrefixContext {
     bindings: Bindings,
-    prefix: Rc<Prefix>,
+    prefix: Prefix,
 }
 #[derive(Debug)]
 pub(crate) struct ContextStore {
@@ -74,7 +73,7 @@ impl ContextStore {
             index: ContextIndex::new(),
         }
     }
-    fn add_choice(&mut self, bindings: Bindings, prefixes: Vec<Rc<Prefix>>) {
+    fn add_choice(&mut self, bindings: Bindings, prefixes: Vec<Prefix>) {
         self.add_helper(|index, id| {
             for p in &prefixes {
                 let name = bindings.get_name(p.name());
@@ -99,7 +98,7 @@ impl ContextStore {
             }
         }
     }
-    fn add_prefix(&mut self, bindings: Bindings, prefix: Rc<Prefix>) {
+    fn add_prefix(&mut self, bindings: Bindings, prefix: Prefix) {
         self.add_helper(|index, id| {
             let name = bindings.get_name(prefix.name());
             index.add(name, prefix.direction(), id);

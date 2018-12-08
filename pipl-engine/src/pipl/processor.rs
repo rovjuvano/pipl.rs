@@ -6,7 +6,6 @@ use crate::pipl::ContextStore;
 use crate::prefix::Action;
 use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
-use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) struct Processor<'a> {
     contexts: &'a mut ContextStore,
@@ -19,7 +18,7 @@ impl<'a> Processor<'a> {
     pub fn react(
         &mut self,
         mut bindings: Bindings,
-        prefix: Rc<Prefix>,
+        prefix: Prefix,
         read_names: Option<Vec<Name>>,
     ) -> Option<Vec<Name>> {
         let mut send_names = None;

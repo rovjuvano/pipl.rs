@@ -5,7 +5,7 @@ fn new_names_in_prefix_do_not_affect_channel() {
     // [w]w(a).(+ [x]x(b).(| [y]y(c).() ) )
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c m n o });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     {
         let choice = builder
@@ -28,7 +28,7 @@ fn new_names_in_prefix_do_not_affect_channel() {
             .send(y).names(&[c]).restrict(&[y]).call(log("[y]y(c)", actual));
     }
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wm = &mut Refs::new();
     let refs_wa = &mut Refs::new();
     refs_wm.insert(w.clone(), pipl.dup_name(w));

@@ -4,7 +4,7 @@ fn new_names_in_repeating_send() {
     // w[x].w[y].y(b).x(c).() ![a]w(a).a[x].() !a(d).()
     let mut pipl = Pipl::new();
     names!(|pipl| { w x y a b c d });
-    let actual = &Rc::new(Results::new());
+    let actual = &Results::new();
     let mut builder = PiplBuilder::new();
     builder
         .read(w).names(&[x]).call(log("w[x]", actual))
@@ -17,7 +17,7 @@ fn new_names_in_repeating_send() {
     builder
         .send(a).names(&[d]).repeat().call(log("!a(d)", actual));
     builder.apply(&mut pipl);
-    let expected = &Rc::new(Results::new());
+    let expected = &Results::new();
     let refs_wx = &mut Refs::new();
     let refs_wax = &mut Refs::new();
     let refs_way = &mut Refs::new();

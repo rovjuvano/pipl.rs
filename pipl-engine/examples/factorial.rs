@@ -2,7 +2,6 @@ extern crate pipl_engine;
 use pipl_engine::{Call, CallFrame, Name, Pipl, PiplBuilder};
 use std::env;
 use std::fmt;
-use std::rc::Rc;
 #[derive(Debug)]
 enum N {
     Str(&'static str),
@@ -70,7 +69,7 @@ fn add_print(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
         .read(&name)
         .names(&[&arg])
         .repeat()
-        .call(Rc::new(PrintCall(arg)));
+        .call(PrintCall(arg));
     name
 }
 fn add_greater_than(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
@@ -113,7 +112,7 @@ fn add_greater_than(pipl: &mut Pipl, builder: &mut PiplBuilder) -> Name {
         .read(&name)
         .names(&[a, b, gt, lte])
         .repeat()
-        .call(Rc::new(gt_call))
+        .call(gt_call)
         .send(out);
     name
 }
@@ -168,7 +167,7 @@ where
     };
     builder
         .read(&name).names(&[a, b, out]).repeat()
-        .call(Rc::new(op))
+        .call(op)
         .send(out).names(&[&result]);
     name
 }

@@ -4,7 +4,6 @@ use crate::pipl::Pipl;
 use crate::prefix::Action;
 use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
-use std::rc::Rc;
 pub enum Builder {
     Prefix(PrefixBuilder),
     Parallel(ParallelBuilder),
@@ -46,7 +45,7 @@ pub struct PrefixBuilder {
     repeating: bool,
     restricts: Vec<Name>,
     names: Vec<Name>,
-    call: Option<Rc<dyn Call>>,
+    call: Option<Box<dyn Call>>,
     next: Box<Builder>,
 }
 impl PrefixBuilder {
@@ -77,8 +76,8 @@ impl PrefixBuilder {
         self
     }
     /// set callback to call between communication and next process
-    pub fn call<'a>(&'a mut self, call: Rc<dyn Call>) -> &'a mut Self {
-        self.call = Some(call);
+    pub fn call<'a, T: Call + 'static>(&'a mut self, call: T) -> &'a mut Self {
+        self.call = Some(Box::new(call));
         self
     }
     fn prefix<'a>(&'a mut self, name: &Name, direction: PrefixDirection) -> &'a mut PrefixBuilder {
@@ -156,7 +155,7 @@ impl PrefixBuilder {
                 }
                 actions.push(Action::Parallel(sequences));
             }
-            Builder::Prefix(b) => actions.push(Action::Prefix(Rc::new(b.build()))),
+            Builder::Prefix(b) => actions.push(Action::Prefix(b.build())),
             Builder::Terminal => {}
         };
         Prefix::new(name, direction, actions)
@@ -191,12 +190,12 @@ impl ParallelBuilder {
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(name, PrefixDirection::Send)
     }
-    fn build(self) -> (Vec<Name>, Vec<Rc<Prefix>>) {
+    fn build(self) -> (Vec<Name>, Vec<Prefix>) {
         let ParallelBuilder {
             restricts,
             sequences,
         } = self;
-        let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
+        let p = sequences.into_iter().map(|x| x.build()).collect();
         (restricts, p)
     }
 }
@@ -229,12 +228,12 @@ impl ChoiceBuilder {
     pub fn send<'a>(&'a mut self, name: &Name) -> &'a mut PrefixBuilder {
         self.prefix(name, PrefixDirection::Send)
     }
-    fn build(self) -> (Vec<Name>, Vec<Rc<Prefix>>) {
+    fn build(self) -> (Vec<Name>, Vec<Prefix>) {
         let ChoiceBuilder {
             restricts,
             sequences,
         } = self;
-        let p = sequences.into_iter().map(|x| Rc::new(x.build())).collect();
+        let p = sequences.into_iter().map(|x| x.build()).collect();
         (restricts, p)
     }
 }
