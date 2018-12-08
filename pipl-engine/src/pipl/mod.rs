@@ -1,11 +1,8 @@
-pub(crate) mod context;
-pub(crate) mod processor;
+mod processor;
 
 use crate::bindings::Bindings;
 use crate::name::Name;
 use crate::name::NameStore;
-use crate::pipl::context::Context;
-use crate::pipl::context::PrefixContext;
 use crate::pipl::processor::Processor;
 use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
@@ -27,8 +24,7 @@ impl Pipl {
         }
     }
     pub fn add(&mut self, prefix: Prefix) {
-        let p = Rc::new(prefix);
-        self.contexts.add(p.clone(), Context::prefix(p));
+        self.contexts.add_prefix(Bindings::new(), Rc::new(prefix));
     }
     pub fn dup_name(&mut self, name: &Name) -> Name {
         self.names.dup_name(name)
@@ -40,128 +36,168 @@ impl Pipl {
         self.names.new_name(data)
     }
     pub fn step(&mut self) {
-        if let Some((name, reader, sender)) = self.contexts.next() {
-            Processor::new(&mut self.contexts, &mut self.names).activate(name, reader, sender);
+        if let Some((reader, sender)) = self.contexts.next() {
+            let mut p = Processor::new(&mut self.contexts, &mut self.names);
+            let output = p.react(sender.bindings, sender.prefix, None);
+            p.react(reader.bindings, reader.prefix, output);
         }
     }
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ContextId(usize);
+#[derive(Debug)]
+enum Context {
+    Choice(ChoiceContext),
+    Prefix(PrefixContext),
+}
+#[derive(Debug)]
+struct ChoiceContext {
+    bindings: Bindings,
+    prefixes: Vec<Rc<Prefix>>,
+}
+#[derive(Debug)]
+struct PrefixContext {
+    bindings: Bindings,
+    prefix: Rc<Prefix>,
+}
 #[derive(Debug)]
 pub(crate) struct ContextStore {
-    set: ContextSet,
-    ready: ReadySet,
+    data: Vec<Option<Context>>,
+    free: Vec<usize>,
+    index: ContextIndex,
 }
 impl ContextStore {
     fn new() -> Self {
         ContextStore {
-            set: ContextSet::new(),
-            ready: ReadySet::new(),
+            data: Vec::new(),
+            free: Vec::new(),
+            index: ContextIndex::new(),
         }
     }
-    fn add(&mut self, prefix: Rc<Prefix>, context: Context) {
-        let name = context.get_name(prefix.name());
-        self.set.add(name.clone(), prefix.direction(), context);
-        if self.set.is_waiting(&name) {
-            self.ready.add(name);
+    fn add_choice(&mut self, bindings: Bindings, prefixes: Vec<Rc<Prefix>>) {
+        self.add_helper(|index, id| {
+            for p in &prefixes {
+                let name = bindings.get_name(p.name());
+                index.add(name, p.direction(), id);
+            }
+            Context::Choice(ChoiceContext { bindings, prefixes })
+        });
+    }
+    fn add_helper<F>(&mut self, index_and_return: F)
+    where
+        F: FnOnce(&mut ContextIndex, ContextId) -> Context,
+    {
+        match self.free.pop() {
+            Some(id) => {
+                let ctx = index_and_return(&mut self.index, ContextId(id));
+                self.data[id] = Some(ctx);
+            }
+            None => {
+                let id = self.data.len();
+                let ctx = index_and_return(&mut self.index, ContextId(id));
+                self.data.push(Some(ctx));
+            }
         }
+    }
+    fn add_prefix(&mut self, bindings: Bindings, prefix: Rc<Prefix>) {
+        self.add_helper(|index, id| {
+            let name = bindings.get_name(prefix.name());
+            index.add(name, prefix.direction(), id);
+            Context::Prefix(PrefixContext { bindings, prefix })
+        });
     }
     fn collapse(
         &mut self,
-        context: Context,
+        context_id: ContextId,
         name: &Name,
         direction: PrefixDirection,
     ) -> PrefixContext {
-        match context {
+        match self.remove(context_id).unwrap() {
             Context::Choice(ctx) => {
                 let mut r = None;
-                for p in ctx.prefixes.iter() {
+                for p in ctx.prefixes.into_iter() {
                     let n = ctx.bindings.get_name(p.name());
                     if r.is_none() && *name == n && direction == p.direction() {
                         r = Some(p);
                     } else {
-                        self.set.remove(&n, p.direction(), &*ctx.bindings);
+                        self.index.remove(&n, p.direction(), &context_id);
                     }
                 }
-                PrefixContext::new(r.unwrap().clone(), Rc::try_unwrap(ctx.bindings).unwrap())
+                PrefixContext {
+                    bindings: ctx.bindings,
+                    prefix: r.unwrap(),
+                }
             }
             Context::Prefix(ctx) => ctx,
         }
     }
-    fn next(&mut self) -> Option<(Name, Context, Context)> {
-        if let Some(name) = self.ready.next() {
-            let (read, send) = self.set.next(&name);
-            Some((name, read, send))
+    fn next(&mut self) -> Option<(PrefixContext, PrefixContext)> {
+        if let Some((name, read, send)) = self.index.next() {
+            let reader = self.collapse(read, &name, PrefixDirection::Read);
+            let sender = self.collapse(send, &name, PrefixDirection::Send);
+            Some((reader, sender))
+        } else {
+            None
+        }
+    }
+    fn remove(&mut self, id: ContextId) -> Option<Context> {
+        if id.0 < self.data.len() {
+            match self.data[id.0].take() {
+                ctx @ Some(_) => {
+                    self.free.push(id.0);
+                    ctx
+                }
+                None => None,
+            }
         } else {
             None
         }
     }
 }
 #[derive(Debug, Default)]
-struct ContextSet {
-    set: BTreeMap<Name, (Vec<Context>, Vec<Context>)>,
+struct ContextIndex {
+    queues: BTreeMap<Name, (Vec<ContextId>, Vec<ContextId>)>,
+    ready: BTreeSet<Name>,
 }
-impl ContextSet {
+impl ContextIndex {
     fn new() -> Self {
-        ContextSet {
-            set: BTreeMap::new(),
+        ContextIndex {
+            queues: BTreeMap::new(),
+            ready: BTreeSet::new(),
         }
     }
-    fn add(&mut self, name: Name, direction: PrefixDirection, context: Context) {
+    fn add(&mut self, name: Name, direction: PrefixDirection, context_id: ContextId) {
         let (reads, sends) = self
-            .set
-            .entry(name)
+            .queues
+            .entry(name.clone())
             .or_insert_with(|| (Vec::new(), Vec::new()));
-        let queue = match direction {
-            PrefixDirection::Read => reads,
-            PrefixDirection::Send => sends,
+        match direction {
+            PrefixDirection::Read => reads.push(context_id),
+            PrefixDirection::Send => sends.push(context_id),
         };
-        queue.push(context);
-    }
-    fn is_waiting(&self, name: &Name) -> bool {
-        if let Some((reads, sends)) = self.set.get(name) {
-            !reads.is_empty() && !sends.is_empty()
-        } else {
-            false
+        if !reads.is_empty() && !sends.is_empty() {
+            self.ready.insert(name);
         }
     }
-    fn next(&mut self, name: &Name) -> (Context, Context) {
-        let (mut reads, mut sends) = self.set.remove(name).unwrap();
-        (reads.remove(0), sends.remove(0))
+    fn next(&mut self) -> Option<(Name, ContextId, ContextId)> {
+        let maybe = self.ready.iter().next().cloned();
+        if let Some(name) = maybe {
+            self.ready.remove(&name);
+            let (mut reads, mut sends) = self.queues.remove(&name).unwrap();
+            Some((name, reads.remove(0), sends.remove(0)))
+        } else {
+            None
+        }
     }
-    fn remove(&mut self, name: &Name, direction: PrefixDirection, bindings: &Bindings) {
-        if let Some((reads, sends)) = self.set.get_mut(name) {
+    fn remove(&mut self, name: &Name, direction: PrefixDirection, context_id: &ContextId) {
+        if let Some((reads, sends)) = self.queues.get_mut(name) {
             let queue = match direction {
                 PrefixDirection::Read => reads,
                 PrefixDirection::Send => sends,
             };
-            if let Some(i) = queue.iter().position(|x| match x {
-                Context::Choice(ctx) => ::std::ptr::eq(&*ctx.bindings, bindings),
-                _ => false,
-            }) {
+            if let Some(i) = queue.iter().position(|x| x == context_id) {
                 queue.remove(i);
             }
-        }
-    }
-}
-#[derive(Debug, Default)]
-struct ReadySet {
-    set: BTreeSet<Name>,
-}
-impl ReadySet {
-    fn new() -> Self {
-        ReadySet {
-            set: BTreeSet::new(),
-        }
-    }
-    fn add(&mut self, name: Name) {
-        self.set.insert(name);
-    }
-    fn next(&mut self) -> Option<Name> {
-        let maybe = self.set.iter().next().cloned();
-        if let Some(name) = maybe {
-            self.set.remove(&name);
-            Some(name)
-        } else {
-            None
         }
     }
 }
