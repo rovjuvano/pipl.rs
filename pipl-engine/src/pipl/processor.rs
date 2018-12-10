@@ -2,12 +2,12 @@ use crate::bindings::Bindings;
 use crate::call::CallFrame;
 use crate::name::Name;
 use crate::name::NameStore;
-use crate::pipl::ContextStore;
+use crate::pipl::context::ContextStore;
 use crate::prefix::Action;
 use crate::prefix::Prefix;
 use crate::prefix::PrefixDirection;
 #[derive(Debug)]
-pub(crate) struct Processor<'a> {
+pub(in pipl) struct Processor<'a> {
     contexts: &'a mut ContextStore,
     names: &'a mut NameStore,
 }
