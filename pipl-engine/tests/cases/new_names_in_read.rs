@@ -24,8 +24,8 @@ fn new_names_in_read() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    refs_wa.insert(w.clone(), pipl.dup_name(w));
-    refs_wa.insert(x.clone(), pipl.dup_name(x));
+    refs_wa.insert(w.clone(), w.clone());
+    refs_wa.insert(x.clone(), x.clone());
     refs_wa.insert(m.clone(), w.clone());
     expected.log("y[m]", refs_wa.clone());
     expected.log("y(w)", refs_wx.clone());

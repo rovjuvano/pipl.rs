@@ -32,10 +32,10 @@ fn new_names_in_parallel_prefixes() {
     pipl.step();
     let refs_wxwx = &mut refs_wx.clone();
     let refs_wxwy = &mut refs_wx.clone();
-    let x2 = pipl.dup_name(x);
+    let x2 = x.clone();
     refs_wxwx.insert(x.clone(), x2.clone());
     refs_wxwy.insert(y.clone(), x2.clone());
-    refs_wxwy.insert(a.clone(), pipl.dup_name(a));
+    refs_wxwy.insert(a.clone(), a.clone());
     expected.log("[a]w[y]", refs_wxwy.clone());
     expected.log("[x]w(x)", refs_wxwx.clone());
     pipl.step();

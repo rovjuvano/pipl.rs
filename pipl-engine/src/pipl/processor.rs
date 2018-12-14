@@ -66,6 +66,6 @@ impl<'a> Processor<'a> {
 }
 fn restrict(bindings: &mut Bindings, names: &mut NameStore, new_names: &Vec<Name>) {
     for name in new_names.iter() {
-        bindings.set_name(name.clone(), names.dup_name(name));
+        bindings.set_name(name.clone(), names.new_name());
     }
 }
