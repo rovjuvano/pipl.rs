@@ -39,8 +39,8 @@ fn new_names_before_parallel() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    refs_wx.insert(w.clone(), w.clone());
-    refs_wx.insert(x.clone(), x.clone());
+    refs_wx.insert(w.clone(), pipl.dup_name(w));
+    refs_wx.insert(x.clone(), pipl.dup_name(x));
     let refs_wxxo = &mut refs_wx.clone();
     let refs_wxyp = &mut refs_wx.clone();
     refs_wxyp.insert(p.clone(), b.clone());

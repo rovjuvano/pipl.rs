@@ -24,9 +24,9 @@ fn new_names_in_send() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    let w2 = w.clone();
+    let w2 = &pipl.dup_name(w);
     refs_wx.insert(w.clone(), w2.clone());
-    refs_wx.insert(x.clone(), x.clone());
+    refs_wx.insert(x.clone(), pipl.dup_name(x));
     refs_wa.insert(m.clone(), w2.clone());
     expected.log("y[m]", refs_wa.clone());
     expected.log("y(w)", refs_wx.clone());

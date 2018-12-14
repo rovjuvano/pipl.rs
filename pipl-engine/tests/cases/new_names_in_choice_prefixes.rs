@@ -40,8 +40,8 @@ fn new_names_in_choice_prefixes() {
     expected.log("w[x]", refs_wx.clone());
     expected.log("w(a)", refs_wa.clone());
     pipl.step();
-    let m2 = m.clone();
-    let n2 = n.clone();
+    let m2 = pipl.dup_name(m);
+    let n2 = pipl.dup_name(n);
     refs_wx.insert(m.clone(), m2.clone());
     refs_wx.insert(y.clone(), n2.clone());
     refs_wa.insert(n.clone(), n2.clone());

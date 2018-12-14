@@ -20,4 +20,5 @@ mod cases {
     mod new_names_before_choice;
     mod new_names_in_parallel_prefixes;
     mod new_names_in_choice_prefixes;
+    mod mixed_name_value_types;
 }

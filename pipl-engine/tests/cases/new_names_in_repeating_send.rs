@@ -21,13 +21,13 @@ fn new_names_in_repeating_send() {
     let refs_wx = &mut Refs::new();
     let refs_wax = &mut Refs::new();
     let refs_way = &mut Refs::new();
-    refs_wx.insert(x.clone(), a.clone());
-    refs_wax.insert(a.clone(), a.clone());
+    refs_wx.insert(x.clone(), pipl.dup_name(a));
+    refs_wax.insert(a.clone(), pipl.dup_name(a));
     expected.log("w[x]", refs_wx.clone());
     expected.log("![a]w(a)", refs_wax.clone());
     pipl.step();
-    refs_wx.insert(y.clone(), a.clone());
-    refs_way.insert(a.clone(), a.clone());
+    refs_wx.insert(y.clone(), pipl.dup_name(a));
+    refs_way.insert(a.clone(), pipl.dup_name(a));
     expected.log("w[y]", refs_wx.clone());
     expected.log("![a]w(a)", refs_way.clone());
     pipl.step();
